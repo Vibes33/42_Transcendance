@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+*.sqlite
+*.sqlite-*
+/data/
+traefik/certs/*.pem
+traefik/certs/*.key
+traefik/certs/*.crt
+.DS_Store
+council-*
+
+# Configuration locale de l’outil de développement
+.claude/

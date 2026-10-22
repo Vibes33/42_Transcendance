@@ -1,0 +1,347 @@
+@import "tailwindcss";
+
+/* Identité visuelle de la maquette : formes coupées, palettes Ardoise (sombre) et Porcelaine (clair).
+   Les couleurs sont des variables CSS ; Tailwind les expose en utilitaires (bg-surf, text-acc…). */
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-bg: var(--bg);
+  --color-surf: var(--surf);
+  --color-surf2: var(--surf2);
+  --color-line: var(--line);
+  --color-mut: var(--mut);
+  --color-acc: var(--acc);
+  --color-on-acc: var(--on-acc);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-part: var(--part);
+  --color-ko: var(--ko);
+  --font-d: "Chakra Petch", sans-serif;
+  --font-b: "Manrope", sans-serif;
+}
+
+:root {
+  --cut-lg: polygon(40px 0, 100% 0, 100% calc(100% - 40px), calc(100% - 40px) 100%, 0 100%, 0 40px);
+  --cut-md: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px);
+  --cut-sm: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  --para: polygon(18px 0, 100% 0, calc(100% - 18px) 100%, 0 100%);
+  --acc: #a195ff;
+}
+
+/* Ardoise */
+:root.dark {
+  color-scheme: dark;
+  --ink: #eef0f3;
+  --on-acc: #0f1115;
+  --shadow: #050608;
+  --bg: #0f1115;
+  --surf: #181b21;
+  --surf2: #21252d;
+  --line: #343a45;
+  --mut: #a9b0bc;
+  --ok: #3dbe80;
+  --warn: #f2b84b;
+  --danger: #ff6b6b;
+  /* Cases du Champion du jour */
+  --part: #c9821f;
+  --ko: #b8443c;
+  --cell-ok: #2e9c68;
+}
+
+/* Porcelaine */
+:root.light {
+  color-scheme: light;
+  --ink: #1a1a18;
+  --on-acc: #ffffff;
+  --shadow: #24241f;
+  --bg: #f1f1ee;
+  --surf: #ffffff;
+  --surf2: #ecece8;
+  --line: #d3d2cc;
+  --mut: #5b5a55;
+  --ok: #2b7f55;
+  --warn: #a86a0c;
+  --danger: #c62828;
+  --part: #b06a12;
+  --ko: #a8392f;
+  --cell-ok: #2b7f55;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-b);
+}
+
+body {
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+}
+
+a:focus-visible,
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 3px;
+}
+
+input::placeholder {
+  color: var(--mut);
+  font-weight: 500;
+}
+
+@utility cut-sm {
+  clip-path: var(--cut-sm);
+}
+@utility cut-md {
+  clip-path: var(--cut-md);
+}
+@utility cut-lg {
+  clip-path: var(--cut-lg);
+}
+@utility para {
+  clip-path: var(--para);
+}
+/* Petit libellé : 12–13 px, majuscules, espacé, couleur atténuée */
+@utility label {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mut);
+}
+@utility gutter {
+  padding-left: clamp(16px, 5vw, 72px);
+  padding-right: clamp(16px, 5vw, 72px);
+}
+
+/* Liens de navigation : soulignés à l'accent quand actifs */
+.nl {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--mut);
+  text-decoration: none;
+}
+.nl:hover,
+.nl.on {
+  color: var(--ink);
+}
+.nl.on {
+  border-bottom-color: var(--acc);
+}
+
+/* Lien texte souligné */
+.tl {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+.tl:hover {
+  color: var(--acc);
+}
+
+.knob {
+  transition: transform 0.2s;
+}
+.dark .knob {
+  transform: translateX(38px);
+}
+.dark .i-moon,
+.light .i-sun {
+  color: var(--on-acc);
+}
+
+/* Infobulle (solo verrouillé en groupe…) */
+.tipw {
+  position: relative;
+  display: inline-flex;
+}
+.tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 280px;
+  padding: 10px 14px;
+  background: var(--ink);
+  color: var(--bg);
+  clip-path: var(--cut-sm);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 5;
+}
+.tipw:hover .tip,
+.tipw:focus-within .tip {
+  opacity: 1;
+}
+
+.fr-row:hover {
+  background: var(--surf2);
+}
+.fr-in:focus-within {
+  background: var(--acc) !important;
+}
+.opt:hover {
+  background: var(--surf2) !important;
+}
+.kb:focus-visible {
+  outline: 2px dashed var(--acc);
+  outline-offset: 8px;
+}
+.scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+/* Animations fonctionnelles de la maquette */
+@keyframes drawer {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+.drawer {
+  animation: drawer 0.22s ease both;
+}
+
+@keyframes flip {
+  0% {
+    opacity: 0;
+    transform: perspective(400px) rotateX(80deg);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+.flip {
+  animation: flip 0.45s ease both;
+}
+
+.tile {
+  transition: transform 0.12s ease;
+}
+.tile:hover:not(:disabled) {
+  transform: translateY(-3px);
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: none;
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+.shake {
+  animation: shake 0.35s ease;
+}
+
+@keyframes pop {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+  }
+  15% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-28px);
+  }
+}
+.pop {
+  animation: pop 1.2s ease forwards;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise {
+  animation: rise 0.45s ease both;
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.appear {
+  animation: appear 0.3s ease both;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.toast {
+  animation: toast-in 0.2s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

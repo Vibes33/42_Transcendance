@@ -1,0 +1,13 @@
+{
+  "name": "@loltr/content",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./lite": "./src/lite.ts"
+  },
+  "dependencies": {
+    "@loltr/shared": "workspace:*"
+  }
+}

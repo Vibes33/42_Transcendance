@@ -1,0 +1,39 @@
+http:
+  middlewares:
+    # Le client ne peut pas se faire passer pour quelqu'un d'autre : on efface ces en-têtes
+    # avant que forwardAuth ne les remplisse avec l'identité vérifiée par le service auth.
+    strip-identity:
+      headers:
+        customRequestHeaders:
+          X-User-Id: ""
+          X-User-Kind: ""
+          X-Device-Id: ""
+          X-User-Test: ""
+          X-Internal-Token: ""
+    auth:
+      forwardAuth:
+        address: "http://auth:3000/api/auth/verify"
+        authResponseHeaders: [X-User-Id, X-User-Kind, X-Device-Id, X-User-Test]
+    rate-limit:
+      rateLimit:
+        average: 60
+        burst: 120
+        period: 1s
+    rate-limit-auth:
+      rateLimit:
+        average: 10
+        burst: 30
+        period: 1s
+    compress:
+      compress: {}
+    security-headers:
+      headers:
+        stsSeconds: 31536000
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        customResponseHeaders:
+          X-Powered-By: ""
+    api-chain:
+      chain:
+        middlewares: [security-headers, rate-limit, strip-identity, auth]

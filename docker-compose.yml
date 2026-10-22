@@ -1,0 +1,112 @@
+# LolTR — toute la stack démarre avec : docker compose up --build
+name: loltr
+
+x-service: &service
+  build:
+    context: .
+    dockerfile: Dockerfile.service
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    REDIS_URL: redis://redis:6379
+  depends_on:
+    redis:
+      condition: service_healthy
+  networks: [backend]
+
+services:
+  certs:
+    image: alpine/openssl:3.5.9
+    entrypoint: ["sh", "/scripts/gen-certs.sh"]
+    environment:
+      CERT_DIR: /certs
+    volumes:
+      - ./scripts/gen-certs.sh:/scripts/gen-certs.sh:ro
+      - certs:/certs
+
+  traefik:
+    image: traefik:v3.7.16
+    restart: unless-stopped
+    depends_on:
+      certs:
+        condition: service_completed_successfully
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - certs:/certs:ro
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [backend]
+
+  redis:
+    image: redis:8.6.7
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [backend]
+
+  auth:
+    <<: *service
+    build: { context: ., dockerfile: Dockerfile.service, args: { SERVICE: auth } }
+    environment: { REDIS_URL: "redis://redis:6379", DB_FILE: /data/auth.sqlite }
+    volumes: [auth-data:/data]
+
+  profil:
+    <<: *service
+    build: { context: ., dockerfile: Dockerfile.service, args: { SERVICE: profil } }
+    environment: { REDIS_URL: "redis://redis:6379", DB_FILE: /data/profil.sqlite }
+    volumes: [profil-data:/data]
+
+  social:
+    <<: *service
+    build: { context: ., dockerfile: Dockerfile.service, args: { SERVICE: social } }
+    environment: { REDIS_URL: "redis://redis:6379", DB_FILE: /data/social.sqlite }
+    volumes: [social-data:/data]
+
+  jeux:
+    <<: *service
+    build: { context: ., dockerfile: Dockerfile.service, args: { SERVICE: jeux } }
+    environment: { REDIS_URL: "redis://redis:6379", DB_FILE: /data/jeux.sqlite }
+    volumes: [jeux-data:/data]
+
+  classement:
+    <<: *service
+    build: { context: ., dockerfile: Dockerfile.service, args: { SERVICE: classement } }
+    environment: { REDIS_URL: "redis://redis:6379", DB_FILE: /data/classement.sqlite }
+    volumes: [classement-data:/data]
+
+  temps-reel:
+    <<: *service
+    build: { context: ., dockerfile: Dockerfile.service, args: { SERVICE: temps-reel } }
+    environment: { REDIS_URL: "redis://redis:6379" }
+
+  front:
+    build:
+      context: .
+      dockerfile: apps/front/Dockerfile
+    restart: unless-stopped
+    networks: [backend]
+
+volumes:
+  certs:
+  redis:
+  auth-data:
+  profil-data:
+  social-data:
+  jeux-data:
+  classement-data:
+
+networks:
+  backend:

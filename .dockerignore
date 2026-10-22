@@ -1,0 +1,7 @@
+**/node_modules
+**/dist
+**/.env
+**/*.sqlite*
+.git
+traefik/certs
+council-*

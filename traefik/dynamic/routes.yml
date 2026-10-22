@@ -1,0 +1,67 @@
+# Routage : le front sur /, chaque microservice sur /api/<service>, le temps réel sur /ws.
+http:
+  routers:
+    front:
+      rule: "PathPrefix(`/`)"
+      priority: 1
+      entryPoints: [websecure]
+      service: front
+      middlewares: [security-headers, compress]
+    auth:
+      rule: "PathPrefix(`/api/auth`)"
+      entryPoints: [websecure]
+      service: auth
+      middlewares: [security-headers, rate-limit-auth]
+    profil:
+      rule: "PathPrefix(`/api/profil`)"
+      entryPoints: [websecure]
+      service: profil
+      middlewares: [api-chain]
+    social:
+      rule: "PathPrefix(`/api/social`)"
+      entryPoints: [websecure]
+      service: social
+      middlewares: [api-chain]
+    jeux:
+      rule: "PathPrefix(`/api/jeux`)"
+      entryPoints: [websecure]
+      service: jeux
+      middlewares: [api-chain]
+    classement:
+      rule: "PathPrefix(`/api/classement`)"
+      entryPoints: [websecure]
+      service: classement
+      middlewares: [api-chain]
+    temps-reel-api:
+      rule: "PathPrefix(`/api/temps-reel`)"
+      entryPoints: [websecure]
+      service: temps-reel
+      middlewares: [api-chain]
+    temps-reel-ws:
+      rule: "Path(`/ws`)"
+      entryPoints: [websecure]
+      service: temps-reel
+      middlewares: [strip-identity, auth]
+
+  services:
+    front:
+      loadBalancer:
+        servers: [{ url: "http://front:3000" }]
+    auth:
+      loadBalancer:
+        servers: [{ url: "http://auth:3000" }]
+    profil:
+      loadBalancer:
+        servers: [{ url: "http://profil:3000" }]
+    social:
+      loadBalancer:
+        servers: [{ url: "http://social:3000" }]
+    jeux:
+      loadBalancer:
+        servers: [{ url: "http://jeux:3000" }]
+    classement:
+      loadBalancer:
+        servers: [{ url: "http://classement:3000" }]
+    temps-reel:
+      loadBalancer:
+        servers: [{ url: "http://temps-reel:3000" }]

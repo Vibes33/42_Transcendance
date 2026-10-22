@@ -1,0 +1,29 @@
+# Image commune des microservices Bun + Elysia. SERVICE = dossier dans services/.
+FROM oven/bun:1.4.3 AS deps
+WORKDIR /app
+COPY package.json bun.lock ./
+COPY packages/shared/package.json packages/shared/
+COPY packages/content/package.json packages/content/
+COPY services/auth/package.json services/auth/
+COPY services/profil/package.json services/profil/
+COPY services/social/package.json services/social/
+COPY services/jeux/package.json services/jeux/
+COPY services/classement/package.json services/classement/
+COPY services/temps-reel/package.json services/temps-reel/
+COPY apps/front/package.json apps/front/
+RUN bun install --frozen-lockfile --ignore-scripts
+
+FROM oven/bun:1.4.3
+ARG SERVICE
+ENV NODE_ENV=production SERVICE=${SERVICE}
+WORKDIR /app
+# Toute l'arborescence installée : Bun place aussi des liens node_modules dans chaque paquet
+COPY --from=deps /app ./
+COPY tsconfig.base.json ./
+COPY packages ./packages
+COPY services/${SERVICE} ./services/${SERVICE}
+RUN mkdir -p /data && chown -R bun:bun /data
+USER bun
+EXPOSE 3000
+HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD bun -e "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["sh", "-c", "bun run services/${SERVICE}/src/index.ts"]

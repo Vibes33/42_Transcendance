@@ -1,0 +1,21 @@
+{
+  "name": "@loltr/profil",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@loltr/shared": "workspace:*",
+    "@loltr/content": "workspace:*",
+    "drizzle-orm": "0.45.4",
+    "elysia": "1.4.30",
+    "ioredis": "5.11.1"
+  },
+  "devDependencies": {
+    "drizzle-kit": "0.31.11"
+  }
+}

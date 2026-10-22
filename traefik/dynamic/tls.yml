@@ -1,0 +1,9 @@
+tls:
+  certificates:
+    - certFile: /certs/loltr.crt
+      keyFile: /certs/loltr.key
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/loltr.crt
+        keyFile: /certs/loltr.key
