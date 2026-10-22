@@ -8,6 +8,7 @@ import { fmt, useLang, useT } from "../i18n";
 import { chibiName } from "../lib/chibi";
 import { useMe } from "../state/app";
 import { useUi } from "../state/ui";
+import { ChibiView } from "./ChibiView";
 import { CloseBtn } from "./ui";
 
 // Vitrine des skins d'un chibi : aperçu, statut (équipé, possédé, prix), équiper ou acheter en éclats.
@@ -106,10 +107,19 @@ export function Vitrine({ chibiKey, owned, onClose }: { chibiKey: string; owned:
           <div className="relative flex-[1_1_360px] min-w-0 h-[470px] max-sm:h-[380px]">
             <div className="absolute inset-x-0 bottom-0 top-16 bg-line cut-lg">
               <div className="absolute inset-[1.5px] cut-lg bg-surf2 overflow-hidden">
-                <img src={skin.art} alt="" className="block w-full h-full object-cover" style={{ filter: skin.cut ? "blur(10px) saturate(1.1)" : d.got ? "none" : "grayscale(.6) brightness(.7)", transform: "scale(1.12)" }} />
+                <img src={skin.art} alt="" className="block w-full h-full object-cover" style={{ filter: skin.cut || skin.model3d ? "blur(10px) saturate(1.1)" : d.got ? "none" : "grayscale(.6) brightness(.7)", transform: "scale(1.12)" }} />
               </div>
             </div>
-            {skin.cut && <img src={skin.cut} alt={t("Chibi {name}", { name })} className="absolute top-0 left-[4%] w-[92%] h-[456px] max-sm:h-[370px] object-contain" style={{ objectPosition: "50% 100%" }} />}
+            <ChibiView
+              key={skin.id}
+              img={skin.cut}
+              model3d={skin.model3d}
+              placement="vitrine"
+              bleed={0.08}
+              alt={t("Chibi {name}", { name })}
+              className="absolute top-0 left-0 w-full h-[456px] max-sm:h-[370px] object-contain"
+              style={{ objectPosition: "50% 100%", filter: d.got ? "none" : "grayscale(.5) brightness(.75)" }}
+            />
             <div className="absolute top-20 right-3.5 px-3 py-[7px] bg-surf cut-sm font-d font-bold text-[12.5px] tracking-[0.08em] uppercase">{d.status}</div>
           </div>
           <div className="flex-[1_1_400px] min-w-0 flex flex-col gap-3">

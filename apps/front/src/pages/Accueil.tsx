@@ -43,7 +43,8 @@ export function Accueil() {
   const random = me.random;
   const heroCut = !random ? (me.skin?.cut ?? null) : found && dayChibi ? dayChibi.skins[0].cut : null;
   const heroArt = !random ? (me.skin?.art ?? RANDOM_ART) : found && dayChibi ? dayChibi.skins[0].art : RANDOM_ART;
-  const model3d = !random && me.profile ? (CHIBI_BY_KEY[me.profile.chibi]?.model3d ?? null) : null;
+  // Modèle 3D du skin équipé ; en aléatoire, celui du chibi du champion du jour une fois trouvé
+  const model3d = !random ? (me.skin?.model3d ?? null) : found && dayChibi ? dayChibi.skins[0].model3d : null;
   const heroPlate = !random && me.skin && me.profile ? skinLabel(CHIBI_BY_KEY[me.profile.chibi], me.skin, lang) : found && dayChamp ? dayChamp.names[namesLang] : t("Chibi aléatoire");
   const heroSub = !random ? t("Ton chibi") : found && dayChamp ? dayChamp.titles[namesLang] : t("Change à chaque visite");
 
@@ -177,6 +178,7 @@ export function Accueil() {
             <ChibiView
               img={heroCut}
               model3d={model3d}
+              bleed={0.25}
               alt={heroPlate}
               className="absolute -top-14 left-0 w-full h-[610px] max-sm:h-[460px] object-contain"
               style={{ objectPosition: "50% 100%", filter: LIT, transition: "opacity .7s ease, transform .7s ease" }}

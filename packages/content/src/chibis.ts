@@ -12,6 +12,8 @@ export interface ChibiSkin {
   price: number;
   art: string;
   cut: string | null;
+  /** Modèle 3D du skin (GLB), affiché à la place de l'image détourée. */
+  model3d: string | null;
 }
 
 export interface Chibi {
@@ -132,10 +134,40 @@ export const MODELS_3D: Record<string, string> = {
   zoe: "/models/zoe.glb",
 };
 
-/** Multiplicateur de cadrage 3D par chibi (1 = cadrage auto).
- * Le cadrage de base est calcule a la volee depuis les dimensions reelles du
- * modele (voir ChibiView) ; article sous-dimensionné à ajuster ici. */
-export const MODEL_ZOOM: Record<string, number> = {};
+/**
+ * Réglage fin d'un modèle 3D, par nom de fichier sans extension (« lux », « lux-sg »).
+ * Tous les chibis sont affichés à la même échelle (celle du jeu), centrés, pieds en bas du cadre ; seuls
+ * les modèles trop hauts pour la zone sont réduits. On corrige ici :
+ * - zoom : taille (1 = taille commune, 1.2 = 20 % plus grand) ;
+ * - x, y : décalage horizontal / vertical, en fraction de la hauteur visible (0.05 = 5 %) ;
+ * - yaw : rotation du modèle, en degrés.
+ * Les valeurs se règlent en direct depuis le panneau de test (compte de test), qui donne le code à coller ici.
+ */
+export interface ModelTuning {
+  zoom?: number;
+  x?: number;
+  y?: number;
+  yaw?: number;
+}
+export const MODEL_TUNING: Record<string, ModelTuning> = {};
+
+/** Réglage par emplacement : accueil, profil, vitrine des skins (même principe, appliqué à tous les modèles). */
+export type ModelPlacement = "accueil" | "profil" | "vitrine";
+export const MODEL_PLACEMENTS: Record<ModelPlacement, ModelTuning> = {
+  accueil: {},
+  profil: {},
+  vitrine: {}
+};
+
+/** Animation légère des modèles : balancement (degrés) et flottement (pixels). */
+export const MODEL_MOTION = { sway: 8, float: 6 };
+
+/**
+ * Caméra commune à tous les modèles :
+ * - pitch : angle depuis la verticale (90 = à hauteur du chibi, moins = vu d'au-dessus, plus = vu d'en dessous) ;
+ * - fov : champ de vision en degrés (plus grand = perspective plus marquée, caméra plus proche).
+ */
+export const MODEL_CAMERA = { pitch: 85, fov: 30 };
 
 /** Les 4 chibis proposés à la première connexion. */
 export const STARTERS = ["lux", "jinx", "ekko", "sett"] as const;
@@ -158,7 +190,9 @@ export const CHIBIS: Chibi[] = CHIBI_DATA.map((c) => ({
     kind: s.kind,
     price: s.kind === "base" ? 0 : s.price ?? (s.kind === "prestige" ? PRICES.prestigeDefault : PRICES.skin),
     art: "/img/chibis/" + s.art,
-    cut: s.cut ? "/img/chibis/" + s.cut : null
+    cut: s.cut ? "/img/chibis/" + s.cut : null,
+    // Le modèle de base peut aussi venir de MODELS_3D (tenu à jour par download_chibi.py)
+    model3d: s.model ?? (s.kind === "base" ? (MODELS_3D[c.key] ?? null) : null)
   }))
 }));
 

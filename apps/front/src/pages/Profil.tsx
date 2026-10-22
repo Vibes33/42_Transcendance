@@ -6,6 +6,7 @@ import { post } from "../api/client";
 import { keys, queryClient, useInventory, useLeaderboard, useStats } from "../api/queries";
 import { ArrowBtn, Bar } from "../components/ui";
 import { Gear, Lock, TriLeft, TriRight } from "../components/icons";
+import { ChibiView } from "../components/ChibiView";
 import { Vitrine } from "../components/Vitrine";
 import { fmt, useLang, useT } from "../i18n";
 import { chibiName, skinLabel } from "../lib/chibi";
@@ -131,10 +132,18 @@ export function Profil() {
           <div className="relative" style={{ width: "min(100%, 430px)", height: "min(510px, max(360px, calc(100vh - 360px)))" }}>
             <div className="absolute inset-x-0 top-20 bottom-[30px] bg-acc cut-lg">
               <div className="absolute inset-[2px] cut-lg bg-surf overflow-hidden">
-                <img src={selArt} alt="" className="block w-full h-full object-cover" style={{ filter: random ? "blur(10px) grayscale(1) brightness(0.5)" : me.skin?.cut ? "blur(10px) saturate(1.1)" : "none", transform: "scale(1.12)" }} />
+                <img src={selArt} alt="" className="block w-full h-full object-cover" style={{ filter: random ? "blur(10px) grayscale(1) brightness(0.5)" : me.skin?.cut || me.skin?.model3d ? "blur(10px) saturate(1.1)" : "none", transform: "scale(1.12)" }} />
               </div>
             </div>
-            {selCut && <img src={selCut} alt={random ? t("Ombre d’un chibi tiré au hasard") : t("Chibi {name}", { name: label })} className="absolute top-0 left-[4%] w-[92%] object-contain" style={{ height: "calc(100% - 36px)", objectPosition: "50% 100%", filter: random ? DARK : LIT }} />}
+            <ChibiView
+              img={selCut}
+              model3d={random ? null : (me.skin?.model3d ?? null)}
+              placement="profil"
+              bleed={0.25}
+              alt={random ? t("Ombre d’un chibi tiré au hasard") : t("Chibi {name}", { name: label })}
+              className="absolute top-0 left-0 w-full object-contain"
+              style={{ height: "calc(100% - 36px)", objectPosition: "50% 100%", filter: random ? DARK : LIT }}
+            />
             <div className="absolute left-5 bottom-0 p-[1.5px] bg-acc cut-sm">
               <div className="flex flex-col gap-0.5 px-[18px] py-2 bg-surf cut-sm">
                 <span className="font-d font-bold text-[19px] text-acc">{random ? t("Chibi aléatoire") : chibiName(me.profile.chibi, lang)}</span>

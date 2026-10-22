@@ -25,5 +25,6 @@ COPY services/${SERVICE} ./services/${SERVICE}
 RUN mkdir -p /data && chown -R bun:bun /data
 USER bun
 EXPOSE 3000
-HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD bun -e "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+# La route de santé est sous le préfixe du service (/api/<service>/health), sauf pour temps-reel (/health)
+HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD bun -e "Promise.all(['/api/'+process.env.SERVICE+'/health','/health'].map(p=>fetch('http://127.0.0.1:3000'+p).then(r=>r.ok,()=>false))).then(a=>process.exit(a.some(Boolean)?0:1))"
 CMD ["sh", "-c", "bun run services/${SERVICE}/src/index.ts"]

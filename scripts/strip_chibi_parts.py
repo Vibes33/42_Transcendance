@@ -7,6 +7,10 @@ qu'un seul set de visage. Ce script supprime les primitives superflues
 (chirurgie JSON uniquement : filtrage de meshes[].primitives, aucune
 renumerotation necessaire car rien d'autre ne pointe vers les primitives).
 
+Les fichiers actuels du CDN portent la visibilite de chaque partie (extras) : le
+lecteur du site l'applique lui-meme, ces fichiers sont donc laisses intacts.
+Le script ne sert plus qu'aux anciens fichiers sans ces donnees.
+
 Regles :
   - supprime le socle "Ground" (rendu sur fond transparent, inutile)
   - supprime les doublons d'un autre skin ("Muscle*" prefixe)
@@ -199,7 +203,14 @@ def process(path: Path, dry_run: bool) -> int:
     js, rest = read_glb(path)
     mesh = js["meshes"][0]
     mats = [js["materials"][pr["material"]].get("name", "?") for pr in mesh["primitives"]]
-    keep, drop = decide(key, mats)
+    # Fichiers recents : chaque matiere porte sa visibilite par defaut (extras.visible) et le squelette
+    # les parties montrees par animation. Le lecteur du site (ChibiView) les applique comme modelviewer.lol ;
+    # supprimer des parties ici casserait les clignements et expressions (yeux d'Annie Arcane, etc.).
+    if any("visible" in m.get("extras", {}) for m in js["materials"]):
+        print(f"{key}: visibilite geree par le lecteur, rien a supprimer")
+        return 0
+    # Les skins (« lux-sg ») reprennent les ajustements manuels de leur chibi (« lux »)
+    keep, drop = decide(key.split("-")[0], mats)
     if drop:
         print(f"{key}: DROP {[mats[i] for i in drop]}")
         print(f"{key}: KEEP {[mats[i] for i in keep]}")

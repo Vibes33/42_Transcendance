@@ -15,11 +15,14 @@ RUN bun install --frozen-lockfile --ignore-scripts
 COPY tsconfig.base.json ./
 COPY packages ./packages
 COPY apps/front ./apps/front
-RUN cd apps/front && bun run build
+# Les modèles 3D (~730 Mo) ne passent pas par Vite : sa copie de public/ les charge en mémoire
+# (plusieurs Go). Ils sont copiés tels quels dans l'image finale.
+RUN rm -rf apps/front/public/models && cd apps/front && bun run build
 
 FROM oven/bun:1.4.3
 WORKDIR /app
 COPY --from=build /app/apps/front/dist ./dist
+COPY apps/front/public/models ./dist/models
 COPY apps/front/serve.ts ./serve.ts
 USER bun
 EXPOSE 3000

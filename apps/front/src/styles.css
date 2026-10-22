@@ -345,3 +345,16 @@ input::placeholder {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Chibi 3D : léger flottement vertical (amplitude réglable, --float) */
+@keyframes chibi-float {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(calc(var(--float, 6px) * -1));
+  }
+}
+.chibi-float {
+  animation: chibi-float 2.8s ease-in-out infinite alternate;
+}
