@@ -82,7 +82,60 @@ export const ACCENTS: Record<string, [string, string]> = {
 };
 
 /** Modèles 3D par chibi (voir Chibi.model3d). */
-export const MODELS_3D: Record<string, string> = {};
+export const MODELS_3D: Record<string, string> = {
+  aatrox: "/models/aatrox.glb",
+  ahri: "/models/ahri.glb",
+  akali: "/models/akali.glb",
+  amumu: "/models/amumu.glb",
+  annie: "/models/annie.glb",
+  ashe: "/models/ashe.glb",
+  blitzcrank: "/models/blitzcrank.glb",
+  briar: "/models/briar.glb",
+  caitlyn: "/models/caitlyn.glb",
+  ekko: "/models/ekko.glb",
+  ezreal: "/models/ezreal.glb",
+  gwen: "/models/gwen.glb",
+  irelia: "/models/irelia.glb",
+  janna: "/models/janna.glb",
+  jhin: "/models/jhin.glb",
+  jinx: "/models/jinx.glb",
+  kaisa: "/models/kaisa.glb",
+  katarina: "/models/katarina.glb",
+  kayle: "/models/kayle.glb",
+  leesin: "/models/leesin.glb",
+  lillia: "/models/lillia.glb",
+  lulu: "/models/lulu.glb",
+  lux: "/models/lux.glb",
+  malphite: "/models/malphite.glb",
+  missfortune: "/models/missfortune.glb",
+  morgana: "/models/morgana.glb",
+  neeko: "/models/neeko.glb",
+  orianna: "/models/orianna.glb",
+  riven: "/models/riven.glb",
+  seraphine: "/models/seraphine.glb",
+  sett: "/models/sett.glb",
+  shyvana: "/models/shyvana.glb",
+  sona: "/models/sona.glb",
+  soraka: "/models/soraka.glb",
+  syndra: "/models/syndra.glb",
+  teemo: "/models/teemo.glb",
+  tristana: "/models/tristana.glb",
+  vex: "/models/vex.glb",
+  vi: "/models/vi.glb",
+  xayah: "/models/xayah.glb",
+  yasuo: "/models/yasuo.glb",
+  yone: "/models/yone.glb",
+  yunara: "/models/yunara.glb",
+  yuumi: "/models/yuumi.glb",
+  zed: "/models/zed.glb",
+  zeri: "/models/zeri.glb",
+  zoe: "/models/zoe.glb",
+};
+
+/** Multiplicateur de cadrage 3D par chibi (1 = cadrage auto).
+ * Le cadrage de base est calcule a la volee depuis les dimensions reelles du
+ * modele (voir ChibiView) ; article sous-dimensionné à ajuster ici. */
+export const MODEL_ZOOM: Record<string, number> = {};
 
 /** Les 4 chibis proposés à la première connexion. */
 export const STARTERS = ["lux", "jinx", "ekko", "sett"] as const;

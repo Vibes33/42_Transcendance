@@ -178,7 +178,7 @@ export function Accueil() {
               img={heroCut}
               model3d={model3d}
               alt={heroPlate}
-              className="absolute -top-6 left-[4%] w-[92%] h-[574px] max-sm:h-[430px] object-contain"
+              className="absolute -top-14 left-0 w-full h-[610px] max-sm:h-[460px] object-contain"
               style={{ objectPosition: "50% 100%", filter: LIT, transition: "opacity .7s ease, transform .7s ease" }}
             />
             <div className="absolute left-5 bottom-[30px] p-[1.5px] bg-acc cut-sm">
