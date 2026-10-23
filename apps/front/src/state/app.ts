@@ -128,4 +128,4 @@ export function useApplyTheme() {
 }
 
 export const refreshMe = () =>
-  Promise.all([keys.session, keys.profile, keys.daily, keys.me, keys.group, keys.friends, keys.inventory, keys.shop].map((k) => queryClient.invalidateQueries({ queryKey: k })));
+  Promise.all([keys.session, keys.profile, keys.daily, keys.me, keys.history, keys.group, keys.friends, keys.inventory, keys.shop].map((k) => queryClient.invalidateQueries({ queryKey: k })));

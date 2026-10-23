@@ -73,6 +73,10 @@ export interface DailyGame {
   basePoints: number;
   /** Points prévisionnels (base + bonus de percentile provisoire). */
   projected: number;
+  /** Percentile prévisionnel (part des meilleurs joueurs du jour sur ce jeu) ; null sans performance classable. */
+  top: number | null;
+  /** Joueurs du jour sur ce jeu. */
+  players: number;
   /** Manche jouée (pour la reprendre ou afficher la carte de partage). */
   roundId: string | null;
 }

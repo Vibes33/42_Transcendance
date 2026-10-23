@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { CHIBI_BY_KEY, LITE_BY_ID, RANDOM_ART } from "@loltr/content/lite";
 import type { GameKey } from "@loltr/shared";
-import { useRound } from "../api/queries";
 import { ChibiView } from "../components/ChibiView";
 import { ShareDialog } from "../components/ShareDialog";
 import { SITE_TOUR, Tutorial, markTutorial } from "../components/Tutorial";
@@ -10,13 +9,15 @@ import { fmt, plural, useT } from "../i18n";
 import { skinLabel } from "../lib/chibi";
 import { CARD_BY_KEY } from "../lib/games";
 import { partieUrl, startDefiSolo, startGroup } from "../lib/play";
+import { topLabel } from "../lib/results";
 import { hoursMinutes, localTime, useNow } from "../lib/time";
 import { useMe } from "../state/app";
 import { useLang } from "../i18n";
 import { useLive } from "../state/live";
 
 // Accueil : la rotation du jour (Champion du jour + 3 jeux), les boutons solo et groupe, et le
-// chibi équipé en grand. Une fois le défi terminé : le champion du jour et le partage du résultat.
+// chibi équipé en grand. Une fois le défi terminé, le même écran affiche le percentile prévisionnel
+// de chaque jeu ; le lien Historique mène aux journées précédentes.
 
 const LIT = "brightness(1) drop-shadow(0 0 26px color-mix(in srgb, var(--acc) 45%, transparent))";
 
@@ -29,7 +30,6 @@ export function Accueil() {
   const session = useLive((s) => s.session);
   const [share, setShare] = useState(false);
   const daily = me.daily;
-  const cdjRound = useRound(daily?.games.find((g) => g.key === "cdj")?.roundId ?? null);
   const namesLang = me.profile?.namesLang ?? lang;
 
   const done = daily?.status === "done" || daily?.status === "closed";
@@ -49,7 +49,7 @@ export function Accueil() {
   const heroSub = !random ? t("Ton chibi") : found && dayChamp ? dayChamp.titles[namesLang] : t("Change à chaque visite");
 
   const nextIdx = daily?.games.findIndex((g) => !g.done) ?? 0;
-  const cdjTries = (cdjRound.data?.public as { tries?: number } | undefined)?.tries;
+  const rotationTime = daily ? localTime(daily.nextRotationAt) : "3:00";
   const groupSession = session && session.kind === "group" && session.context === "defi" && session.phase !== "done" ? session : null;
 
   const solo = () => {
@@ -65,37 +65,42 @@ export function Accueil() {
     <div className="relative flex-auto flex flex-col">
       <main className="flex-auto w-full max-w-[1760px] mx-auto min-h-[calc(100vh-85px)] box-border flex flex-wrap items-center justify-center gap-x-24 gap-y-8 pt-7 pb-9 gutter">
         <div className="flex-[1_1_460px] min-w-0">
-          {!done ? (
-            <div className="flex flex-col items-start gap-[22px]" style={{ width: "min(100%, 620px)" }}>
-              <div className="text-xl font-medium text-mut">{t("Rotation du jour")}</div>
-              <h1 className="m-0 font-d font-bold leading-[0.98] tracking-[-0.01em]" style={{ fontSize: "clamp(40px, 5vw, 72px)" }}>
-                {t("4 jeux,")}
-                <br />
-                <span className="text-acc">{t("un seul défi")}</span>
-              </h1>
-              <p className="m-0 max-w-[560px] text-[16.5px] leading-relaxed text-mut">
-                {t("Enchaîne les quatre jeux du jour d’une traite, seul ou en équipe avec tes amis. La rotation change chaque jour à {time}.", { time: daily ? localTime(daily.nextRotationAt) : "3:00" })}
-              </p>
-              <ol aria-label={t("Les 4 jeux de la rotation, dans l’ordre")} className="m-0 p-0 list-none grid grid-cols-1 sm:grid-cols-2 gap-2.5 self-stretch" data-tuto="rotation">
-                {(daily?.games ?? []).map((g, i) => {
-                  const card = CARD_BY_KEY[g.key];
-                  const isCdj = g.key === "cdj";
-                  const img = isCdj ? (found && dayChibi ? dayChibi.skins[0].art : RANDOM_ART) : card.img;
-                  return (
-                    <li key={g.key} className="flex items-center gap-3 py-2 pr-3.5 pl-2 cut-sm" style={{ background: started && i === nextIdx ? "color-mix(in srgb, var(--acc) 16%, var(--surf))" : "var(--surf)" }}>
-                      <span className="basis-[30px] shrink-0 h-[30px] flex items-center justify-center bg-acc text-on-acc cut-sm font-d font-bold text-[15px]">{i + 1}</span>
-                      <span className="basis-12 shrink-0 h-12 overflow-hidden bg-surf2 cut-sm">
-                        <img src={img} alt="" className="block w-full h-full object-cover" style={{ filter: isCdj && !g.done ? "grayscale(1) brightness(0.35) blur(3px)" : "none" }} />
-                      </span>
-                      <span className="min-w-0 flex flex-col gap-0.5 text-left">
-                        <span className="font-d font-bold text-base">{t(card.name)}</span>
-                        <span className="text-[12.5px] text-mut">{isCdj && g.done && dayChamp ? t("Trouvé : {name}", { name: dayChamp.names[namesLang] }) : t(card.short ?? card.tags)}</span>
-                      </span>
-                      {g.done && <span className="ml-auto font-d font-bold text-sm text-ok">✓ +{g.projected}</span>}
-                    </li>
-                  );
-                })}
-              </ol>
+          <div className="flex flex-col items-start gap-[22px]" style={{ width: "min(100%, 620px)" }}>
+            <div className="text-xl font-medium text-mut">{t("Rotation du jour")}</div>
+            <h1 className="m-0 font-d font-bold leading-[0.98] tracking-[-0.01em]" style={{ fontSize: "clamp(40px, 5vw, 72px)" }}>
+              {t("4 jeux,")}
+              <br />
+              <span className="text-acc">{t("un seul défi")}</span>
+            </h1>
+            <p className="m-0 max-w-[560px] text-[16.5px] leading-relaxed text-mut">
+              {done
+                ? (dayChamp ? (found ? t("Bien joué, c’était {name}.", { name: dayChamp.names[namesLang] }) : t("Pas cette fois, c’était {name}.", { name: dayChamp.names[namesLang] })) + " " : "") +
+                  t("Ton classement sur chaque jeu est prévisionnel : il évolue au fil des parties des autres joueurs et devient définitif à {time}.", { time: rotationTime })
+                : t("Enchaîne les quatre jeux du jour d’une traite, seul ou en équipe avec tes amis. La rotation change chaque jour à {time}.", { time: rotationTime })}
+            </p>
+            <ol aria-label={t("Les 4 jeux de la rotation, dans l’ordre")} className="m-0 p-0 list-none grid grid-cols-1 sm:grid-cols-2 gap-2.5 self-stretch" data-tuto="rotation">
+              {(daily?.games ?? []).map((g, i) => {
+                const card = CARD_BY_KEY[g.key];
+                const isCdj = g.key === "cdj";
+                const img = isCdj ? (found && dayChibi ? dayChibi.skins[0].art : RANDOM_ART) : card.img;
+                // Rotation finie : le percentile prévisionnel remplace la description du jeu
+                const sub = done ? topLabel(g.top, g.players) : isCdj && g.done && dayChamp ? t("Trouvé : {name}", { name: dayChamp.names[namesLang] }) : t(card.short ?? card.tags);
+                return (
+                  <GameRow
+                    key={g.key}
+                    n={i + 1}
+                    img={img}
+                    dim={isCdj && !g.done}
+                    name={t(card.name)}
+                    sub={sub}
+                    subAccent={done && g.top !== null}
+                    points={g.done ? g.projected : null}
+                    active={started && !done && i === nextIdx}
+                  />
+                );
+              })}
+            </ol>
+            {!done && (
               <div className="flex flex-wrap justify-center gap-x-[18px] gap-y-3 self-stretch" data-tuto="play">
                 <span className="tipw">
                   <button
@@ -114,57 +119,41 @@ export function Accueil() {
                     </span>
                   )}
                 </span>
-                <button type="button" onClick={group} className="relative h-14 px-10 border-0 bg-ink text-ink para cursor-pointer font-d font-bold text-base tracking-[0.05em] uppercase">
-                  <span aria-hidden="true" className="absolute inset-[2px] para" style={{ background: me.inGroup ? "color-mix(in srgb, var(--acc) 18%, var(--surf))" : "var(--surf)" }} />
-                  <span className="relative">{started ? t("Continuer avec des amis") : t("Jouer avec des amis")}</span>
-                </button>
+                <OutlineBtn onClick={group} on={me.inGroup}>
+                  {started ? t("Continuer avec des amis") : t("Jouer avec des amis")}
+                </OutlineBtn>
               </div>
-              <div className="flex flex-wrap gap-x-10 gap-y-4 pt-[22px] border-t border-line self-stretch">
-                <Stat label={t("Série en cours")} value={t("{n} " + plural(me.streak, "jour", "jours"), { n: me.streak })} />
-                <Stat label={t("Points du jour")} value={fmt(daily?.projectedTotal ?? 0)} hint={t("prévisionnels")} />
-                <Stat label={t("Nouvelle rotation dans")} value={daily ? hoursMinutes(daily.nextRotationAt - now) : "—"} />
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-start gap-[26px]">
-              <div className="text-[22px] font-medium text-mut">{found ? t("Défi du jour réussi") : t("Défi du jour terminé")}</div>
-              <h1 className="m-0 font-d font-bold leading-[0.98] tracking-[-0.01em]" style={{ fontSize: "clamp(44px, 6.2vw, 92px)" }}>
-                {found ? t("Bien joué,") : t("Pas cette fois,")}
-                <br />
-                {t("c’était")} <span className="text-acc">{dayChamp?.names[namesLang] ?? "…"}</span>
-              </h1>
-              <p className="m-0 max-w-[540px] text-[17px] leading-[1.65] text-mut">
-                {found
-                  ? t("Tu as démasqué {name}, {title}. Tes points sont prévisionnels : le bonus de classement est définitif à {time}.", { name: dayChamp?.names[namesLang] ?? "", title: dayChamp?.titles[namesLang] ?? "", time: daily ? localTime(daily.nextRotationAt) : "3:00" })
-                  : t("{name}, {title}, t’a échappé aujourd’hui. Nouveau défi à {time}.", { name: dayChamp?.names[namesLang] ?? "", title: dayChamp?.titles[namesLang] ?? "", time: daily ? localTime(daily.nextRotationAt) : "3:00" })}
-              </p>
-              <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-                <button type="button" onClick={() => nav("/jeux")} className="h-14 px-11 border-0 bg-acc text-on-acc para cursor-pointer font-d font-bold text-[17px] tracking-[0.05em] uppercase">
+            )}
+            {done && (
+              <div className="flex flex-wrap justify-center gap-x-[18px] gap-y-3 self-stretch">
+                <button type="button" onClick={() => nav("/jeux")} className="h-14 px-10 border-0 bg-acc text-on-acc para cursor-pointer font-d font-bold text-base tracking-[0.05em] uppercase">
                   {t("Jouer aux mini-jeux")}
                 </button>
-                <button type="button" className="tl min-h-14 text-[17px]" onClick={() => setShare(true)}>
-                  {t("Partager mon résultat")}
+                <OutlineBtn onClick={() => setShare(true)}>{t("Partager mon résultat")}</OutlineBtn>
+              </div>
+            )}
+            {done && (me.classement?.today.unlocks.length ?? 0) > 0 && (
+              <div role="status" className="flex flex-wrap items-center gap-2.5 py-2.5 pl-3 pr-4 cut-sm self-stretch" style={{ background: "color-mix(in srgb, var(--acc) 16%, var(--surf))" }}>
+                <span className="label !text-acc">{t("Débloqué aujourd’hui")}</span>
+                {me.classement!.today.unlocks.map((i) => (
+                  <span key={i} className="font-d font-bold text-base">
+                    {t(CARD_BY_KEY[i.slice(5) as GameKey]?.name ?? i)}
+                  </span>
+                ))}
+                <span className="text-[13.5px] text-mut">{t("jouable sans limite en mode classique")}</span>
+              </div>
+            )}
+            <div className="flex flex-wrap items-end gap-x-10 gap-y-4 pt-[22px] border-t border-line self-stretch">
+              <Stat label={t("Série en cours")} value={t("{n} " + plural(me.streak, "jour", "jours"), { n: me.streak })} />
+              <Stat label={t("Points du jour")} value={fmt(daily?.projectedTotal ?? 0)} hint={t("prévisionnels")} />
+              <Stat label={t("Nouvelle rotation dans")} value={daily ? hoursMinutes(daily.nextRotationAt - now) : "—"} />
+              {!me.isAnon && (
+                <button type="button" className="tl ml-auto min-h-11 text-[15px]" onClick={() => nav("/historique")}>
+                  {t("Historique")}
                 </button>
-              </div>
-              {(me.classement?.today.unlocks.length ?? 0) > 0 && (
-                <div role="status" className="flex flex-wrap items-center gap-2.5 py-2.5 pl-3 pr-4 cut-sm" style={{ background: "color-mix(in srgb, var(--acc) 16%, var(--surf))" }}>
-                  <span className="label !text-acc">{t("Débloqué aujourd’hui")}</span>
-                  {me.classement!.today.unlocks.map((i) => (
-                    <span key={i} className="font-d font-bold text-base">
-                      {t(CARD_BY_KEY[i.slice(5) as GameKey]?.name ?? i)}
-                    </span>
-                  ))}
-                  <span className="text-[13.5px] text-mut">{t("jouable sans limite en mode classique")}</span>
-                </div>
               )}
-              <div className="flex flex-wrap gap-x-10 gap-y-4 pt-[22px] border-t border-line">
-                <Stat label={found ? t("Trouvé en") : t("Essais")} value={cdjTries !== undefined ? t("{n} " + plural(cdjTries, "essai", "essais"), { n: cdjTries }) : "—"} />
-                <Stat label={t("Points du jour")} value={"+" + fmt(daily?.projectedTotal ?? 0)} accent />
-                <Stat label={t("Série en cours")} value={t("{n} " + plural(me.streak, "jour", "jours"), { n: me.streak })} />
-                <Stat label={t("Nouvelle rotation dans")} value={daily ? hoursMinutes(daily.nextRotationAt - now) : "—"} />
-              </div>
             </div>
-          )}
+          </div>
         </div>
 
         <div className="flex-[1_1_380px] min-w-0 flex justify-center">
@@ -195,6 +184,31 @@ export function Accueil() {
       {share && daily && <ShareDialog daily={daily} onClose={() => setShare(false)} />}
       {showTour && <Tutorial steps={SITE_TOUR} onDone={() => markTutorial("site")} />}
     </div>
+  );
+}
+
+function GameRow({ n, img, dim, name, sub, subAccent, points, active }: { n: number; img: string; dim?: boolean; name: string; sub: string; subAccent?: boolean; points: number | null; active?: boolean }) {
+  return (
+    <li className="flex items-center gap-3 py-2 pr-3.5 pl-2 cut-sm" style={{ background: active ? "color-mix(in srgb, var(--acc) 16%, var(--surf))" : "var(--surf)" }}>
+      <span className="basis-[30px] shrink-0 h-[30px] flex items-center justify-center bg-acc text-on-acc cut-sm font-d font-bold text-[15px]">{n}</span>
+      <span className="basis-12 shrink-0 h-12 overflow-hidden bg-surf2 cut-sm">
+        <img src={img} alt="" className="block w-full h-full object-cover" style={{ filter: dim ? "grayscale(1) brightness(0.35) blur(3px)" : "none" }} />
+      </span>
+      <span className="min-w-0 flex flex-col gap-0.5 text-left">
+        <span className="font-d font-bold text-base">{name}</span>
+        <span className={subAccent ? "font-d font-bold text-[13.5px] text-acc" : "text-[12.5px] text-mut"}>{sub}</span>
+      </span>
+      {points !== null && <span className={`ml-auto font-d font-bold text-sm ${points > 0 ? "text-ok" : "text-mut"}`}>+{fmt(points)}</span>}
+    </li>
+  );
+}
+
+function OutlineBtn({ onClick, on, children }: { onClick: () => void; on?: boolean; children: ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} className="relative h-14 px-10 border-0 bg-ink text-ink para cursor-pointer font-d font-bold text-base tracking-[0.05em] uppercase">
+      <span aria-hidden="true" className="absolute inset-[2px] para" style={{ background: on ? "color-mix(in srgb, var(--acc) 18%, var(--surf))" : "var(--surf)" }} />
+      <span className="relative">{children}</span>
+    </button>
   );
 }
 

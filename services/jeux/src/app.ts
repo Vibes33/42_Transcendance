@@ -28,7 +28,7 @@ export interface JeuxDeps {
   /** Session temps réel (groupe ou stream) : graine partagée et membres. */
   session: (sessionId: string) => Promise<{ kind: "group" | "stream"; seed: string; members: string[]; game?: string | null } | null>;
   /** Points prévisionnels de la journée (service classement), au mieux. */
-  projection: (userId: string, day: string) => Promise<Record<string, { base: number; projected: number }>>;
+  projection: (userId: string, day: string) => Promise<Record<string, { base: number; projected: number; top?: number; ranked?: boolean; players?: number }>>;
   fetchImage?: (url: string) => Promise<Response>;
   now?: () => number;
 }
@@ -70,12 +70,13 @@ export function createJeuxApp(deps: JeuxDeps) {
     const row = dailyRow(userId, day);
     const games = (row?.games as GameKey[]) ?? rotationFor(day);
     const played = defiRounds(userId, day);
-    const proj = await deps.projection(userId, day).catch(() => ({}) as Record<string, { base: number; projected: number }>);
+    const proj = await deps.projection(userId, day).catch(() => ({}) as Awaited<ReturnType<JeuxDeps["projection"]>>);
     const list = games.map((key) => {
       const r = played.find((x) => x.game === key && x.over);
       const base = r?.basePoints ?? 0;
       const any = r ?? played.find((x) => x.game === key);
-      return { key, done: !!r, basePoints: base, projected: proj[key]?.projected ?? base, roundId: any?.id ?? null };
+      const p = r ? proj[key] : undefined;
+      return { key, done: !!r, basePoints: base, projected: p?.projected ?? base, top: p?.ranked && p.top !== undefined ? p.top : null, players: p?.players ?? 0, roundId: any?.id ?? null };
     });
     const cdj = played.find((x) => x.game === "cdj" && x.over);
     const next = list.find((g) => !g.done)?.key ?? null;
@@ -170,7 +171,7 @@ export function createJeuxApp(deps: JeuxDeps) {
     .get("/daily", ({ caller }) => {
       if (!caller.id) {
         const day = dayKey(now());
-        return { day, nextRotationAt: nextRotationAt(now()), games: rotationFor(day).map((key) => ({ key, done: false, basePoints: 0, projected: 0, roundId: null })), mode: null, status: "todo", nextGame: "cdj", projectedTotal: 0, groupSessionId: null, cdjChampion: null, cdjFound: false } satisfies DailyState;
+        return { day, nextRotationAt: nextRotationAt(now()), games: rotationFor(day).map((key) => ({ key, done: false, basePoints: 0, projected: 0, top: null, players: 0, roundId: null })), mode: null, status: "todo", nextGame: "cdj", projectedTotal: 0, groupSessionId: null, cdjChampion: null, cdjFound: false } satisfies DailyState;
       }
       return dailyState(caller.id, now());
     })

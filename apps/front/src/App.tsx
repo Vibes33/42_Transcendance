@@ -17,6 +17,7 @@ import { Parametres } from "./pages/Parametres";
 import { Partie } from "./pages/Partie";
 import { Profil } from "./pages/Profil";
 import { Recap } from "./pages/Recap";
+import { Historique } from "./pages/Historique";
 import { Live, Obs, Stream } from "./pages/Stream";
 import { useApplyTheme, useMe } from "./state/app";
 import { connectLive, useLive } from "./state/live";
@@ -90,6 +91,7 @@ export function App() {
         <Route path="/jeux" element={<Jeux />} />
         <Route path="/partie" element={<Partie />} />
         <Route path="/recap" element={<Recap />} />
+        <Route path="/historique" element={<Historique />} />
         <Route path="/classement" element={<Classement />} />
         <Route path="/boutique" element={<Boutique />} />
         <Route path="/profil" element={<Profil />} />

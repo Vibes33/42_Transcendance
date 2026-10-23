@@ -7,7 +7,7 @@ import { fmt, useLang, useT } from "../i18n";
 import { refreshMe, toggleMode, useMe, useTheme } from "../state/app";
 import { disconnectLive, useLive } from "../state/live";
 import { useUi, type LoginReason } from "../state/ui";
-import { Broadcast, Chevron, Dots, Flame, Friends, Gear, Globe, Lock, Logo, Logout, Moon, Shard, Sun, UserIcon } from "./icons";
+import { Broadcast, Chevron, Clock, Dots, Flame, Friends, Gear, Globe, Lock, Logo, Logout, Moon, Shard, Sun, UserIcon } from "./icons";
 
 // En-tête collant : logo, 4 onglets, puis série, éclats, amis et le menu de l'avatar, qui regroupe
 // profil, paramètres, mode streamer, langue, thème et déconnexion.
@@ -29,7 +29,7 @@ export function Header() {
     jeux: path === "/jeux" || (path === "/partie" && inGameCtx === "classique"),
     classement: path === "/classement",
     boutique: path === "/boutique",
-    compte: path === "/profil" || path === "/parametres" || path === "/stream"
+    compte: path === "/profil" || path === "/historique" || path === "/parametres" || path === "/stream"
   };
   const guard = (reason: LoginReason, to: string) => () => (me.isUser ? nav(to) : ui.askLogin(reason));
   const groupCount = me.groupMembers.length || 1;
@@ -212,6 +212,7 @@ function AccountMenu({ active }: { active: boolean }) {
             {me.isUser && (
               <>
                 <MenuItem icon={<UserIcon />} label={t("Profil et collection")} onClick={go("/profil")} />
+                <MenuItem icon={<Clock />} label={t("Historique des parties")} onClick={go("/historique")} />
                 <MenuItem icon={<Gear />} label={t("Paramètres")} onClick={go("/parametres")} />
                 <MenuItem icon={<Broadcast />} label={t("Mode streamer")} onClick={go("/stream")} />
               </>
@@ -227,6 +228,7 @@ function AccountMenu({ active }: { active: boolean }) {
                     ui.askLogin("compte");
                   }}
                 />
+                <MenuItem icon={<Clock />} label={t("Historique des parties")} onClick={go("/historique")} />
                 <MenuItem icon={<Gear />} label={t("Paramètres")} onClick={go("/parametres")} />
               </>
             )}

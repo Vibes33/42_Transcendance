@@ -45,18 +45,46 @@ export function ownedItems(db: Db, userId: string): string[] {
   return db.select({ i: inventory.item }).from(inventory).where(eq(inventory.userId, userId)).all().map((r) => r.i);
 }
 
+export interface GameProjection {
+  base: number;
+  bonus: number;
+  projected: number;
+  /** Part des meilleurs joueurs du jour sur ce jeu (0 < top ≤ 1). */
+  top: number;
+  /** Performance classable : sinon pas de bonus de percentile. */
+  ranked: boolean;
+  /** Joueurs du jour sur ce jeu. */
+  players: number;
+}
+
 /** Bonus prévisionnel par jeu : percentile du joueur parmi tous les résultats du jour pour ce jeu. */
-export function projection(db: Db, userId: string, day: string): Record<string, { base: number; bonus: number; projected: number; top: number }> {
+export function projection(db: Db, userId: string, day: string): Record<string, GameProjection> {
   const mine = db.select().from(results).where(and(eq(results.userId, userId), eq(results.day, day))).all();
-  const out: Record<string, { base: number; bonus: number; projected: number; top: number }> = {};
+  const out: Record<string, GameProjection> = {};
   for (const r of mine) {
     const all = db.select({ result: results.result }).from(results).where(and(eq(results.day, day), eq(results.game, r.game))).all().map((x) => x.result as RoundResult);
     const me = r.result as RoundResult;
     const top = topFraction(me, all);
-    const bonus = bonusPoints(top, hasPerformance(me));
-    out[r.game] = { base: r.basePoints, bonus, projected: r.basePoints + bonus, top };
+    const ranked = hasPerformance(me);
+    const bonus = bonusPoints(top, ranked);
+    out[r.game] = { base: r.basePoints, bonus, projected: r.basePoints + bonus, top, ranked, players: all.length };
   }
   return out;
+}
+
+/** Historique du défi du jour : les dernières journées du joueur, jeu par jeu (percentile définitif une fois le jour clos). */
+export function history(db: Db, userId: string, limit: number) {
+  const list = db.select().from(days).where(eq(days.userId, userId)).orderBy(desc(days.day)).limit(limit).all();
+  return list.map((d) => {
+    const proj = projection(db, userId, d.day);
+    const rows = db.select().from(results).where(and(eq(results.userId, userId), eq(results.day, d.day))).all();
+    const order = rotationFor(d.day);
+    const games = rows
+      .sort((a, b) => order.indexOf(a.game as GameKey) - order.indexOf(b.game as GameKey))
+      .map((r) => ({ game: r.game as GameKey, result: r.result as RoundResult, ...proj[r.game] }));
+    const final = !!db.select().from(finalizedDays).where(eq(finalizedDays.day, d.day)).get();
+    return { day: d.day, completed: d.completed, final, total: final && d.finalTotal !== null ? d.finalTotal : games.reduce((s, g) => s + g.projected, 0), games };
+  });
 }
 
 export function projectedTotal(db: Db, userId: string, day: string): number {

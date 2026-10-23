@@ -26,6 +26,7 @@ export const keys = {
   profile: ["profile"] as const,
   daily: ["daily"] as const,
   me: ["classement-me"] as const,
+  history: ["history"] as const,
   leaderboard: (scope: string, period: string) => ["leaderboard", scope, period] as const,
   shop: ["shop"] as const,
   inventory: ["inventory"] as const,
@@ -43,6 +44,26 @@ export interface ClassementMe {
   rank: { tier: string; division: number | null; position: number | null; total: number };
   today: { projected: number; games: Record<string, { base: number; bonus: number; projected: number }>; unlocks: string[] };
   recentShards: { delta: number; reason: string; ref: string; at: number }[];
+}
+
+export interface HistoryGame {
+  game: GameKey;
+  result: { found?: boolean; skinFound?: boolean; tries?: number; champions?: number; correct?: number; durationMs: number };
+  base: number;
+  bonus: number;
+  projected: number;
+  top: number;
+  ranked: boolean;
+  players: number;
+}
+
+export interface HistoryDay {
+  day: string;
+  completed: boolean;
+  /** Bonus de percentile définitifs (jour clos à 3 h 30). */
+  final: boolean;
+  total: number;
+  games: HistoryGame[];
 }
 
 export interface Leaderboard {
@@ -86,6 +107,9 @@ export const useClassementMe = (enabled: boolean) =>
 
 export const useLeaderboard = (scope: "mondial" | "copains", period: "jour" | "semaine" | "saison" | "toujours", enabled = true) =>
   useQuery({ queryKey: keys.leaderboard(scope, period), queryFn: () => get<Leaderboard>(`/api/classement/leaderboard?scope=${scope}&period=${period}`), enabled });
+
+export const useHistory = (enabled = true) =>
+  useQuery({ queryKey: keys.history, queryFn: async () => (await get<{ days: HistoryDay[] }>("/api/classement/history?limit=60")).days, enabled });
 
 export const useShop = () => useQuery({ queryKey: keys.shop, queryFn: () => get<ShopData>("/api/classement/shop") });
 

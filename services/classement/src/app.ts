@@ -4,7 +4,7 @@ import { addDays, dayKey, seasonOf, weekKey, type LeaderRow, type PublicPlayer, 
 import { callerPlugin, fail, health, internalGuard, requireAccount, requireSession, requireTester, type EventMap, type EventType } from "@loltr/shared/server";
 import type { Db } from "./db";
 import { community, days, inventory, ledger, results, streaks, wallets, weeks } from "./schema";
-import { balanceOf, credit, dailyUnlocksOf, ownedItems, periodPoints, projection, projectedTotal, rankOf, streakOf, type Period } from "./core";
+import { balanceOf, credit, dailyUnlocksOf, history, ownedItems, periodPoints, projection, projectedTotal, rankOf, streakOf, type Period } from "./core";
 import { CATALOG, CATALOG_BY_ID, featuredPrestige, isKnownItem } from "./shop";
 
 export interface ClassementDeps {
@@ -54,6 +54,10 @@ export function createClassementApp(deps: ClassementDeps) {
         today: { projected: projectedTotal(db, me, today), games: projection(db, me, today), unlocks: dailyUnlocksOf(db, me, today) },
         recentShards: recent.map((l) => ({ delta: l.delta, reason: l.reason, ref: l.ref, at: l.at }))
       };
+    })
+    // Historique du défi du jour, jour par jour
+    .get("/history", ({ caller, query }) => ({ days: history(db, requireSession(caller), Math.min(Math.max(Number(query.limit) || 30, 1), 120)) }), {
+      query: t.Object({ limit: t.Optional(t.String()) })
     })
     .get(
       "/leaderboard",
