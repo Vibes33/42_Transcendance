@@ -87,7 +87,7 @@ export function CloseBtn({ onClick, label, className = "" }: { onClick: () => vo
 }
 
 /** Flèche de carrousel : contour encre, triangle à l'accent. */
-export function ArrowBtn({ onClick, label, size = 56, children }: { onClick: () => void; label: string; size?: number; children: ReactNode }) {
+export function ArrowBtn({ onClick, label, size = 56, children }: { onClick: (e: { detail: number }) => void; label: string; size?: number; children: ReactNode }) {
   return (
     <button type="button" onClick={onClick} aria-label={label} className="relative p-0 border-0 bg-ink cut-sm cursor-pointer" style={{ flex: `0 0 ${size}px`, height: size }}>
       <span className="absolute inset-[1.5px] flex items-center justify-center bg-surf cut-sm text-acc">{children}</span>

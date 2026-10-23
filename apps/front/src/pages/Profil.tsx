@@ -124,10 +124,6 @@ export function Profil() {
       setCIdx(t);
       if (open) setVitrine(key);
       else centerKey(key);
-      if (import.meta.env.DEV) {
-        // Diagnostic : indique pourquoi l'ouverture est instantanée au lieu de glisser.
-        console.debug("[carrousel] ouverture instantanée", { bande: !!strip, carte: !!el, mouvementReduit: reduced, depart: cur0, cible: t });
-      }
       return;
     }
     cancelGlide();
