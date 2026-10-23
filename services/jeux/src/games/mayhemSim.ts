@@ -57,7 +57,9 @@ function simGame(r: R, blue: number, red: number, ra: number, rb: number): Mayhe
   const add = (t: number, kind: MayhemEvent["kind"], s: Side, at: [number, number], whoS: number[], whoO: number[], killsS: number, killsO: number) => {
     const deadO = kills(other(s), killsS, whoO, whoS.length ? whoS : [0]);
     const deadS = kills(s, killsO, whoS, whoO.length ? whoO : [0]);
-    const ev: MayhemEvent = { t: Math.round(t), kind, side: s, at, ka: s === "a" ? deadO.length : deadS.length, kb: s === "a" ? deadS.length : deadO.length, who: { a: [], b: [] }, dead: { a: [], b: [] } };
+    // Tout se joue avant l'inhibiteur final et le Nexus
+    const when = kind === "nexus" || kind === "inhib" ? t : Math.min(t, duration - 120);
+    const ev: MayhemEvent = { t: Math.round(when), kind, side: s, at, ka: s === "a" ? deadO.length : deadS.length, kb: s === "a" ? deadS.length : deadO.length, who: { a: [], b: [] }, dead: { a: [], b: [] } };
     ev.who[s] = whoS;
     ev.who[other(s)] = whoO;
     ev.dead[s] = deadS;
@@ -141,13 +143,6 @@ function simMatch(r: R, a: number, b: number, entrants: MayhemEntrant[], bo: num
     wins[game.winner === a ? 0 : 1]++;
   }
   return { a, b, bo, wins, winner: wins[0] >= need ? a : b, games };
-}
-
-/** Équipes historiques tirées pour compléter le tournoi. */
-export function historicFill(seed: string, count: number): MayhemEntrant[] {
-  return shuffle(MAYHEM_TEAMS, rng(seed + ":fill"))
-    .slice(0, count)
-    .map((t) => ({ kind: "histo" as const, teamId: t.id, picks: rosterPicks(t), rating: mayhemRating(rosterPicks(t)).rating }));
 }
 
 /** Journées d'une poule de 4 (index dans la poule) : chacun joue contre chacun en Bo1. */

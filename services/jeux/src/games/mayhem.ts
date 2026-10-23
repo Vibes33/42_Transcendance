@@ -1,9 +1,7 @@
-import { rng, shuffle } from "@loltr/shared";
 import {
   MAYHEM_ENTRANTS,
   MAYHEM_JOKERS,
   MAYHEM_ROLES,
-  MAYHEM_TEAMS,
   MAYHEM_TEAM_BY_ID,
   mayhemRating,
   mayhemWins,
@@ -11,7 +9,8 @@ import {
   type MayhemTournament
 } from "@loltr/content";
 import { GameError, type GameEngine } from "./engine";
-import { historicFill, simulateTournament } from "./mayhemSim";
+import { botFill, firstDraw, nextDraw } from "./mayhemDraft";
+import { simulateTournament } from "./mayhemSim";
 
 // World Mayhem : une équipe des Worlds 2020-2025 est tirée au sort, le joueur y prend un joueur pour
 // un poste libre, puis une nouvelle équipe est tirée automatiquement. 3 jokers pour relancer une
@@ -24,6 +23,8 @@ export interface MayhemState {
   group: boolean;
   /** Nombre de tirages faits ; l'équipe courante est `current`. */
   draws: number;
+  /** Position dans le paquet d'équipes (les retours d'équipe ne l'avancent pas). */
+  deckPos?: number;
   current: string;
   picks: MayhemPicks;
   jokers: number;
@@ -36,34 +37,17 @@ export interface MayhemState {
   endedAt: number | null;
 }
 
-/**
- * Paquet mélangé, sans remise : aucune équipe ne revient tant que le paquet n'est pas épuisé, et
- * deux rosters de la même structure (T1 2023 puis T1 2024…) ne se suivent pas.
- */
-function deck(seed: string, cycle: number): string[] {
-  const pile = shuffle(MAYHEM_TEAMS, rng(seed + ":paquet" + cycle));
-  const out: typeof pile = [];
-  while (pile.length) {
-    const i = pile.findIndex((t) => t.org !== out[out.length - 1]?.org);
-    out.push(pile.splice(i < 0 ? 0 : i, 1)[0]);
-  }
-  return out.map((t) => t.id);
-}
-
-/** Tirage n°`n` du draft. */
-const draw = (seed: string, n: number) => deck(seed, Math.floor(n / MAYHEM_TEAMS.length))[n % MAYHEM_TEAMS.length];
-
-/** Tournoi solo : mon équipe en poule A, contre 15 équipes historiques. */
+/** Tournoi solo : mon équipe en poule A, contre 15 bots qui ont drafté avec les mêmes règles. */
 export function soloTournament(s: MayhemState): MayhemTournament {
-  return simulateTournament(s.seed, [{ kind: "me", picks: s.picks, rating: mayhemRating(s.picks).rating }, ...historicFill(s.seed, MAYHEM_ENTRANTS - 1)]);
+  return simulateTournament(s.seed, [{ kind: "me", picks: s.picks, rating: mayhemRating(s.picks).rating }, ...botFill(s.seed, MAYHEM_ENTRANTS - 1)]);
 }
 
 export const mayhem: GameEngine<MayhemState> = {
   key: "mayhem",
   create({ seed, now, group }) {
-    const current = draw(seed, 0);
+    const { current, deckPos } = firstDraw(seed);
     return {
-      state: { seed, group: !!group, draws: 1, current, picks: {}, jokers: MAYHEM_JOKERS, history: [], locked: false, tournament: null, me: 0, startedAt: now, endedAt: null },
+      state: { seed, group: !!group, draws: 1, deckPos, current, picks: {}, jokers: MAYHEM_JOKERS, history: [], locked: false, tournament: null, me: 0, startedAt: now, endedAt: null },
       contentKey: "draft:" + seed
     };
   },
@@ -85,7 +69,7 @@ export const mayhem: GameEngine<MayhemState> = {
     if (this.isOver(s, now)) throw new GameError("round_over", "La partie est terminée.");
     const next = (patch: Partial<MayhemState>, what: string | null): MayhemState => {
       const st: MayhemState = { ...s, ...patch, history: [...s.history, { t: s.current, what }] };
-      if (Object.keys(st.picks).length < 5) return { ...st, current: draw(s.seed, s.draws), draws: s.draws + 1 };
+      if (Object.keys(st.picks).length < 5) return { ...st, ...nextDraw(s.seed, s.draws, s.deckPos ?? s.draws, st.picks, s.current), draws: s.draws + 1 };
       return st;
     };
     switch (action.type) {

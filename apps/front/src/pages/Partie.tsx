@@ -10,7 +10,7 @@ import { GAME_UI } from "../games";
 import { demoRound } from "../games/demo";
 import { useT } from "../i18n";
 import { avatarOf } from "../lib/chibi";
-import { CARD_BY_KEY } from "../lib/games";
+import { CARD_BY_KEY, rememberGameKey } from "../lib/games";
 import { useMe } from "../state/app";
 import { setPresence, useLive } from "../state/live";
 import { StreamCard } from "./Stream";
@@ -133,6 +133,7 @@ export function Partie() {
   );
 
   const quit = async () => {
+    if (ctx === "classique" && game) rememberGameKey(game);
     if (session?.kind === "group") await post(`/api/temps-reel/sessions/${session.id}/leave`).catch(() => {});
     if (session) useLive.getState().setSession(null);
     nav(ctx === "classique" ? "/jeux" : ctx === "streamer" ? "/stream" : "/");

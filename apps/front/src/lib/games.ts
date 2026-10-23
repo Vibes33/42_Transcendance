@@ -47,3 +47,28 @@ export const GAME_TITLE: Record<GameKey, [string, string]> = {
   splash: ["Splash", "mystère"],
   mayhem: ["World", "Mayhem"]
 };
+
+// Jeu affiché par la roue de « Tous les jeux » : retrouvé en revenant d'une partie
+const LAST_GAME = "loltr:jeux-carte";
+
+export function rememberGame(index: number) {
+  try {
+    sessionStorage.setItem(LAST_GAME, String(index));
+  } catch {
+    /* stockage indisponible : la roue repart du jeu par défaut */
+  }
+}
+
+export function rememberGameKey(key: GameKey) {
+  const i = GAME_CARDS.findIndex((g) => g.key === key);
+  if (i >= 0) rememberGame(i);
+}
+
+export function lastGameIndex(fallback: number): number {
+  try {
+    const i = Number(sessionStorage.getItem(LAST_GAME));
+    return Number.isInteger(i) && i >= 0 && i < GAME_CARDS.length && sessionStorage.getItem(LAST_GAME) !== null ? i : fallback;
+  } catch {
+    return fallback;
+  }
+}

@@ -7,7 +7,7 @@ import { ArrowBtn, glow } from "../components/ui";
 import { Shard, TriLeft, TriRight } from "../components/icons";
 import { fmt, useT } from "../i18n";
 import { GameInfo } from "../components/GameInfo";
-import { GAME_CARDS, type GameCard } from "../lib/games";
+import { GAME_CARDS, lastGameIndex, rememberGame, type GameCard } from "../lib/games";
 import { partieUrl, startGroup } from "../lib/play";
 import { useMe } from "../state/app";
 import { useUi } from "../state/ui";
@@ -22,7 +22,12 @@ export function Jeux() {
   const ui = useUi();
   const inv = useInventory(me.isUser);
   const invalidate = useInvalidate();
-  const [idx, setIdx] = useState(1);
+  // La roue revient sur le dernier jeu affiché (ou lancé) au lieu du jeu par défaut
+  const [idx, setIdxState] = useState(() => lastGameIndex(1));
+  const setIdx = (i: number) => {
+    setIdxState(i);
+    rememberGame(i);
+  };
   const [busy, setBusy] = useState(false);
   const n = GAME_CARDS.length;
   const gl = GAME_CARDS[(idx - 1 + n) % n];

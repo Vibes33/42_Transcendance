@@ -70,18 +70,32 @@ export const rosterOf = (picks: MayhemPicks) =>
     return { team, ...team.players[p.i] };
   });
 
+/** Capitaine d'une équipe draftée par un bot : son joueur le mieux noté. */
+export function captainOf(picks: MayhemPicks) {
+  return rosterOf(picks)
+    .filter((p): p is NonNullable<typeof p> => !!p)
+    .sort((x, y) => y.ovr - x.ovr)[0];
+}
+
 /** Nom affiché d'un participant du tournoi. */
 export function entrantName(t: ReturnType<typeof useT>, e: MayhemEntrant, names: Record<string, string>, myId?: string): string {
   if (e.kind === "histo") return mayhemLabel(MAYHEM_TEAM_BY_ID[e.teamId!]);
+  if (e.kind === "bot") return t("Équipe de {name}", { name: captainOf(e.picks)?.name ?? "?" });
   if (e.kind === "me" || (myId && e.userId === myId)) return t("Ton équipe");
   return t("Équipe de {name}", { name: names[e.userId!] ?? "?" });
 }
 
 export const entrantTag = (e: MayhemEntrant, names: Record<string, string>) =>
-  e.kind === "histo" ? MAYHEM_TEAM_BY_ID[e.teamId!].tag : e.kind === "me" ? "TOI" : (names[e.userId!] ?? "?").slice(0, 3).toUpperCase();
+  e.kind === "histo"
+    ? MAYHEM_TEAM_BY_ID[e.teamId!].tag
+    : e.kind === "bot"
+      ? (captainOf(e.picks)?.name ?? "?").slice(0, 3).toUpperCase()
+      : e.kind === "me"
+        ? "TOI"
+        : (names[e.userId!] ?? "?").slice(0, 3).toUpperCase();
 
 export const entrantColor = (e: MayhemEntrant, myId?: string) =>
-  e.kind === "histo" ? MAYHEM_TEAM_BY_ID[e.teamId!].color : e.kind === "me" || e.userId === myId ? "var(--acc)" : "#4B5563";
+  e.kind === "histo" ? MAYHEM_TEAM_BY_ID[e.teamId!].color : e.kind === "bot" ? (captainOf(e.picks)?.team.color ?? "#4B5563") : e.kind === "me" || e.userId === myId ? "var(--acc)" : "#4B5563";
 
 /** Titre et détail d'une action du match. */
 export function eventText(t: ReturnType<typeof useT>, e: MayhemEvent, side: { a: string; b: string }, players: { a: string[]; b: string[] }, champ: (s: "a" | "b", i: number) => string) {

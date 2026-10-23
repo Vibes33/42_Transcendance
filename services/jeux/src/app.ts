@@ -21,7 +21,8 @@ import type { Db } from "./db";
 import { daily, rounds, seen } from "./schema";
 import { ENGINES } from "./games";
 import type { MayhemState } from "./games/mayhem";
-import { historicFill, simulateTournament } from "./games/mayhemSim";
+import { botFill } from "./games/mayhemDraft";
+import { simulateTournament } from "./games/mayhemSim";
 import { rotationFor } from "@loltr/shared";
 
 export interface JeuxDeps {
@@ -356,7 +357,7 @@ export function createJeuxApp(deps: JeuxDeps) {
       if (!tournament && ready.length > 0 && members.every((m) => m.locked || m.gone)) {
         const order = shuffle(ready.map((m) => m.userId), rng(params.sessionId + ":tableau")).slice(0, MAYHEM_ENTRANTS);
         const entrants: MayhemEntrant[] = order.map((u) => ({ kind: "friend", userId: u, picks: stateOf(u)!.picks, rating: mayhemRating(stateOf(u)!.picks).rating }));
-        tournament = simulateTournament(params.sessionId + ":" + order.map((u) => latest.get(u)!.id).join(","), [...entrants, ...historicFill(params.sessionId, MAYHEM_ENTRANTS - entrants.length)]);
+        tournament = simulateTournament(params.sessionId + ":" + order.map((u) => latest.get(u)!.id).join(","), [...entrants, ...botFill(params.sessionId, MAYHEM_ENTRANTS - entrants.length)]);
         for (const u of order) {
           const r = latest.get(u)!;
           const st = r.state as MayhemState;

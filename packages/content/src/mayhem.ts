@@ -180,7 +180,8 @@ export const RIFT = {
 // --- Tournoi simulé (calculé par le serveur, rejoué par l'interface) ------------------------------
 
 export interface MayhemEntrant {
-  kind: "me" | "friend" | "histo";
+  /** « histo » : roster complet (anciens tournois) ; « bot » : équipe draftée par un bot. */
+  kind: "me" | "friend" | "histo" | "bot";
   /** Joueur du site (moi ou un ami du groupe). */
   userId?: string;
   /** Équipe historique qui complète le tableau. */
