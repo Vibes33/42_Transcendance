@@ -132,15 +132,28 @@ function AccountMenu({ active }: { active: boolean }) {
   const ui = useUi();
   const { lang, setLang } = useLang();
   const mode = useTheme((s) => s.mode);
-  const [open, setOpen] = useState(false);
+  // Survol et clic sont indépendants : le menu est visible si l'un des deux est actif.
+  // Un clic alors que le menu est ouvert par survol compte comme une ouverture
+  // (le menu reste épinglé après le départ du curseur), un second clic le désépingle.
+  const [hoverOpen, setHoverOpen] = useState(false);
+  const [clickOpen, setClickOpen] = useState(false);
+  const open = hoverOpen || clickOpen;
   const ref = useRef<HTMLDivElement>(null);
+  // Ferme tout (le survol reprendra à la prochaine entrée du curseur).
+  const dismiss = () => {
+    setHoverOpen(false);
+    setClickOpen(false);
+  };
 
   useEffect(() => {
     if (!open) return;
+    // Clic ailleurs : ne désépingle que le clic, le survol se gère tout seul.
     const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      if (!ref.current?.contains(e.target as Node)) setClickOpen(false);
     };
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") dismiss();
+    };
     document.addEventListener("mousedown", close);
     document.addEventListener("keydown", esc);
     return () => {
@@ -148,10 +161,13 @@ function AccountMenu({ active }: { active: boolean }) {
       document.removeEventListener("keydown", esc);
     };
   }, [open]);
-  useEffect(() => setOpen(false), [me.profile?.userId]);
+  useEffect(() => {
+    setHoverOpen(false);
+    setClickOpen(false);
+  }, [me.profile?.userId]);
 
   const go = (to: string) => () => {
-    setOpen(false);
+    dismiss();
     nav(to);
   };
   const pickLang = (l: SiteLang) => {
@@ -159,7 +175,7 @@ function AccountMenu({ active }: { active: boolean }) {
     if (me.profile?.kind === "user") patch("/api/profil/me", { siteLang: l }).catch(() => {});
   };
   const logout = async () => {
-    setOpen(false);
+    dismiss();
     await actions.logout().catch(() => {});
     disconnectLive();
     queryClient.clear();
@@ -171,13 +187,13 @@ function AccountMenu({ active }: { active: boolean }) {
     <div
       className="relative"
       ref={ref}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseEnter={() => setHoverOpen(true)}
+      onMouseLeave={() => setHoverOpen(false)}
     >
       {me.isAnon ? (
         <button
           type="button"
-          onClick={() => setOpen(!open)}
+          onClick={() => setClickOpen((o) => !o)}
           aria-haspopup="menu"
           aria-expanded={open}
           aria-label={t("Langue et thème")}
@@ -189,7 +205,7 @@ function AccountMenu({ active }: { active: boolean }) {
       ) : (
         <button
           type="button"
-          onClick={() => setOpen(!open)}
+          onClick={() => setClickOpen((o) => !o)}
           aria-haspopup="menu"
           aria-expanded={open}
           aria-label={t("Menu du compte")}
@@ -230,7 +246,7 @@ function AccountMenu({ active }: { active: boolean }) {
                   label={t("Se connecter")}
                   accent
                   onClick={() => {
-                    setOpen(false);
+                    dismiss();
                     ui.askLogin("compte");
                   }}
                 />
