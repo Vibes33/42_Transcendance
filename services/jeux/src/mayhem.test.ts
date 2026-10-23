@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { MAYHEM_ROLES, MAYHEM_TEAM_BY_ID, mayhemRating, mayhemWins, rosterPicks } from "@loltr/content";
+import { MAYHEM_CREST_BY_ID, MAYHEM_ROLES, MAYHEM_TEAM_BY_ID, mayhemRating, mayhemWins, rosterPicks } from "@loltr/content";
 import { mayhem, type MayhemState } from "./games/mayhem";
 import { botFill } from "./games/mayhemDraft";
 import { simulateTournament } from "./games/mayhemSim";
@@ -69,10 +69,25 @@ describe("World Mayhem", () => {
     expect(full).toBeLessThan(10);
   });
 
-  test("les 15 bots d'un tournoi ont des capitaines différents", () => {
-    const bots = botFill("noms", 15);
-    const captains = bots.map((b) => Object.values(b.picks).map((p) => MAYHEM_TEAM_BY_ID[p!.t].players[p!.i]).sort((x, y) => y.ovr - x.ovr)[0].name);
-    expect(new Set(captains).size).toBe(15);
+  test("les 15 bots d'un tournoi portent 15 écussons de vraies équipes, jamais celui du joueur", () => {
+    const bots = botFill("noms", 15, ["t1"]);
+    const ids = bots.map((b) => b.crest!.id);
+    expect(new Set(ids).size).toBe(15);
+    expect(ids).not.toContain("t1");
+    for (const b of bots) expect(MAYHEM_CREST_BY_ID[b.crest!.id]).toBeTruthy();
+  });
+
+  test("écusson : choisi avant le draft, nom libre (2 à 24 caractères), porté dans le tournoi", () => {
+    let s = mayhem.create({ seed: "e", now: T0, seen: new Set() }).state;
+    expect(() => mayhem.act(s, { type: "crest", id: "inconnu", name: "Équipe" }, T0)).toThrow();
+    expect(() => mayhem.act(s, { type: "crest", id: "karminecorp", name: " a " }, T0)).toThrow();
+    s = mayhem.act(s, { type: "crest", id: "karminecorp", name: "  Les   Blue Wall du KC — édition très spéciale  " }, T0).state;
+    expect(s.crest!.name).toBe("Les Blue Wall du KC — éd");
+    expect(s.crest!.tag).toBe("KC");
+    while (Object.keys(s.picks).length < 5) s = mayhem.act(s, { type: "pick", index: MAYHEM_ROLES.findIndex((r) => !s.picks[r]) }, T0).state;
+    s = mayhem.act(s, { type: "lock" }, T0).state;
+    expect(s.tournament!.entrants[0].crest!.id).toBe("karminecorp");
+    expect(s.tournament!.entrants.slice(1).every((e) => e.crest && e.crest.id !== "karminecorp")).toBe(true);
   });
 
   test("3 jokers, pas un de plus", () => {
@@ -95,6 +110,16 @@ describe("World Mayhem", () => {
     const res = mayhem.result(s, T0 + 5000);
     expect(res.wins).toBe(mayhemWins(s.tournament!, 0));
     expect(res.rating).toBe(mayhemRating(s.picks).rating);
+  });
+
+  test("avancement du tournoi enregistré : il ne recule jamais et reprend après une sortie", () => {
+    let s = draft();
+    expect(() => mayhem.act(s, { type: "watched", step: 1 }, T0)).toThrow();
+    s = mayhem.act(s, { type: "lock" }, T0).state;
+    expect((mayhem.publicState(s, T0) as { watched: number }).watched).toBe(0);
+    s = mayhem.act(s, { type: "watched", step: 3 }, T0).state;
+    s = mayhem.act(s, { type: "watched", step: 1 }, T0).state;
+    expect((mayhem.publicState(s, T0) as { watched: number }).watched).toBe(3);
   });
 
   test("simulation : déterministe, Bo respectés, chronologie cohérente", () => {

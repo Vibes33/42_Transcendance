@@ -1,10 +1,13 @@
 import {
+  MAYHEM_CREST_BY_ID,
   MAYHEM_ENTRANTS,
+  MAYHEM_NAME_MAX,
   MAYHEM_JOKERS,
   MAYHEM_ROLES,
   MAYHEM_TEAM_BY_ID,
   mayhemRating,
   mayhemWins,
+  type MayhemCrest,
   type MayhemPicks,
   type MayhemTournament
 } from "@loltr/content";
@@ -21,6 +24,8 @@ import { simulateTournament } from "./mayhemSim";
 export interface MayhemState {
   seed: string;
   group: boolean;
+  /** Écusson et nom d'équipe choisis avant le draft. */
+  crest?: MayhemCrest | null;
   /** Nombre de tirages faits ; l'équipe courante est `current`. */
   draws: number;
   /** Position dans le paquet d'équipes (les retours d'équipe ne l'avancent pas). */
@@ -33,13 +38,16 @@ export interface MayhemState {
   tournament: MayhemTournament | null;
   /** Index de mon équipe dans le tournoi. */
   me: number;
+  /** Parties de mon parcours déjà regardées ou passées : le tournoi reprend là après une sortie. */
+  watched?: number;
   startedAt: number;
   endedAt: number | null;
 }
 
 /** Tournoi solo : mon équipe en poule A, contre 15 bots qui ont drafté avec les mêmes règles. */
 export function soloTournament(s: MayhemState): MayhemTournament {
-  return simulateTournament(s.seed, [{ kind: "me", picks: s.picks, rating: mayhemRating(s.picks).rating }, ...botFill(s.seed, MAYHEM_ENTRANTS - 1)]);
+  const me = { kind: "me" as const, picks: s.picks, rating: mayhemRating(s.picks).rating, crest: s.crest ?? undefined };
+  return simulateTournament(s.seed, [me, ...botFill(s.seed, MAYHEM_ENTRANTS - 1, s.crest ? [s.crest.id] : [])]);
 }
 
 export const mayhem: GameEngine<MayhemState> = {
@@ -53,6 +61,7 @@ export const mayhem: GameEngine<MayhemState> = {
   },
   publicState(s, now) {
     return {
+      crest: s.crest ?? null,
       current: s.locked ? null : s.current,
       picks: s.picks,
       jokers: s.jokers,
@@ -61,6 +70,7 @@ export const mayhem: GameEngine<MayhemState> = {
       group: s.group,
       tournament: s.tournament,
       me: s.me,
+      watched: s.watched ?? 0,
       rating: mayhemRating(s.picks),
       over: this.isOver(s, now)
     };
@@ -73,6 +83,19 @@ export const mayhem: GameEngine<MayhemState> = {
       return st;
     };
     switch (action.type) {
+      case "crest": {
+        // Écusson parmi les équipes des Worlds, nom libre (2 à 24 caractères)
+        const base = MAYHEM_CREST_BY_ID[String(action.id)];
+        const name = String(action.name ?? "")
+          .replace(/[\u0000-\u001f\u007f]/g, "")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, MAYHEM_NAME_MAX);
+        if (!base) throw new GameError("bad_crest", "Écusson inconnu.");
+        if (name.length < 2) throw new GameError("bad_name", "Donne un nom d’au moins 2 caractères à ton équipe.");
+        if (s.locked) throw new GameError("locked", "Ton équipe est déjà validée.");
+        return { state: { ...s, crest: { ...base, name } }, feedback: {} };
+      }
       case "pick": {
         if (s.locked) throw new GameError("locked", "Ton équipe est déjà validée.");
         const i = Number(action.index);
@@ -92,6 +115,11 @@ export const mayhem: GameEngine<MayhemState> = {
         if (Object.keys(s.picks).length < 5) throw new GameError("incomplete", "Il manque des postes.");
         const locked = { ...s, locked: true };
         return { state: s.group ? locked : { ...locked, tournament: soloTournament(locked), me: 0 }, feedback: { locked: true } };
+      }
+      case "watched": {
+        if (!s.locked) throw new GameError("not_locked", "Le tournoi n’a pas encore commencé.");
+        const step = Math.max(0, Math.min(64, Math.floor(Number(action.step)) || 0));
+        return { state: { ...s, watched: Math.max(s.watched ?? 0, step) }, feedback: {} };
       }
       case "done": {
         if (!s.tournament) throw new GameError("no_tournament", "Le tournoi n’a pas encore commencé.");

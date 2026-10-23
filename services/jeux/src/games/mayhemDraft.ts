@@ -1,5 +1,5 @@
 import { rng, shuffle } from "@loltr/shared";
-import { MAYHEM_JOKERS, MAYHEM_ROLES, MAYHEM_TEAMS, MAYHEM_TEAM_BY_ID, mayhemRating, type MayhemEntrant, type MayhemPicks } from "@loltr/content";
+import { MAYHEM_CRESTS, MAYHEM_JOKERS, MAYHEM_ROLES, MAYHEM_TEAMS, MAYHEM_TEAM_BY_ID, mayhemRating, type MayhemEntrant, type MayhemPicks } from "@loltr/content";
 
 // Tirages du draft de World Mayhem, communs au joueur et aux bots : mêmes règles, même niveau.
 
@@ -66,22 +66,17 @@ export function botDraft(seed: string): MayhemPicks {
   return picks;
 }
 
-/** Joueur le mieux noté d'une équipe (à égalité, le premier dans l'ordre des postes, comme l'interface) : il donne son nom à l'équipe du bot. */
-const captain = (picks: MayhemPicks) =>
-  MAYHEM_ROLES.filter((r) => picks[r])
-    .map((r) => MAYHEM_TEAM_BY_ID[picks[r]!.t].players[picks[r]!.i])
-    .sort((x, y) => y.ovr - x.ovr)[0]?.name;
-
-/** Bots qui complètent le tournoi, chacun avec son propre draft (deux bots n'ont jamais le même capitaine). */
-export function botFill(seed: string, count: number): MayhemEntrant[] {
-  const out: MayhemEntrant[] = [];
-  const taken = new Set<string>();
-  for (let k = 0, tries = 0; out.length < count; k++, tries++) {
+/**
+ * Bots qui complètent le tournoi : chacun drafte avec les mêmes règles qu'un joueur (stats équilibrées)
+ * et porte l'écusson et le nom d'une vraie équipe des Worlds, jamais deux fois la même.
+ */
+export function botFill(seed: string, count: number, takenCrests: string[] = []): MayhemEntrant[] {
+  const crests = shuffle(
+    MAYHEM_CRESTS.filter((c) => !takenCrests.includes(c.id)),
+    rng(seed + ":ecussons")
+  );
+  return Array.from({ length: count }, (_, k) => {
     const picks = botDraft(seed + ":bot" + k);
-    const name = captain(picks);
-    if (taken.has(name) && tries < count * 20) continue;
-    taken.add(name);
-    out.push({ kind: "bot", picks, rating: mayhemRating(picks).rating });
-  }
-  return out;
+    return { kind: "bot" as const, picks, rating: mayhemRating(picks).rating, crest: crests[k % crests.length] };
+  });
 }

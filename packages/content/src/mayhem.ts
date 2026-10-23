@@ -1,15 +1,16 @@
 // World Mayhem : rosters des Worlds 2020 à 2025, notes des cartes, liens d'équipe et repères de la
 // Faille de l'invocateur. Partagé par le moteur (service jeux) et l'interface.
-// Notes PROVISOIRES : à recalculer depuis les stats de l'année (Oracle's Elixir, gol.gg) et le
-// parcours de l'équipe aux Worlds (Liquipedia).
+// Notes PROVISOIRES : selon le parcours de l'équipe aux Worlds ; à recalculer depuis les stats de
+// l'année (Oracle's Elixir, gol.gg).
+import { COMPS, CRESTS, ROSTERS } from "./mayhem.data";
 
 export type MayhemRole = "top" | "jgl" | "mid" | "adc" | "sup";
 export const MAYHEM_ROLES: MayhemRole[] = ["top", "jgl", "mid", "adc", "sup"];
 export const MAYHEM_ROLE_LABEL: Record<MayhemRole, string> = { top: "Top", jgl: "Jungle", mid: "Mid", adc: "ADC", sup: "Support" };
 
-/** Parcours de l'équipe aux Worlds : 1 champion, 2 finaliste, 3 demi-finale, 4 quart. */
-export type MayhemPlace = 1 | 2 | 3 | 4;
-export const MAYHEM_PLACE_LABEL: Record<MayhemPlace, string> = { 1: "Champion", 2: "Finaliste", 3: "Demi-finale", 4: "Quart de finale" };
+/** Parcours de l'équipe aux Worlds : 1 champion, 2 finaliste, 3 demi-finale, 4 quart, 5 phase principale, 6 play-in. */
+export type MayhemPlace = 1 | 2 | 3 | 4 | 5 | 6;
+export const MAYHEM_PLACE_LABEL: Record<MayhemPlace, string> = { 1: "Champion", 2: "Finaliste", 3: "Demi-finale", 4: "Quart de finale", 5: "Phase principale", 6: "Play-in" };
 
 export interface MayhemPlayer {
   name: string;
@@ -20,7 +21,10 @@ export interface MayhemPlayer {
 
 export interface MayhemTeam {
   id: string;
+  /** Structure (même organisation au fil des années, malgré ses changements de nom). */
   org: string;
+  /** Nom de l'équipe cette année-là. */
+  name: string;
   tag: string;
   year: number;
   place: MayhemPlace;
@@ -29,31 +33,31 @@ export interface MayhemTeam {
   players: MayhemPlayer[];
 }
 
-function team(id: string, org: string, tag: string, year: number, place: MayhemPlace, color: string, players: [string, number][]): MayhemTeam {
-  return { id, org, tag, year, place, color, players: players.map(([name, ovr], i) => ({ name, ovr, role: MAYHEM_ROLES[i] })) };
-}
-
-export const MAYHEM_TEAMS: MayhemTeam[] = [
-  team("t1-23", "T1", "T1", 2023, 1, "#C8102E", [["Zeus", 93], ["Oner", 91], ["Faker", 95], ["Gumayusi", 92], ["Keria", 94]]),
-  team("t1-24", "T1", "T1", 2024, 1, "#C8102E", [["Zeus", 94], ["Oner", 92], ["Faker", 93], ["Gumayusi", 93], ["Keria", 93]]),
-  team("t1-25", "T1", "T1", 2025, 1, "#C8102E", [["Doran", 89], ["Oner", 90], ["Faker", 92], ["Gumayusi", 93], ["Keria", 94]]),
-  team("dwg-20", "DAMWON", "DWG", 2020, 1, "#1C7C8C", [["Nuguri", 94], ["Canyon", 95], ["ShowMaker", 95], ["Ghost", 88], ["BeryL", 91]]),
-  team("edg-21", "EDG", "EDG", 2021, 1, "#3A4A5C", [["Flandre", 87], ["Jiejie", 89], ["Scout", 92], ["Viper", 94], ["Meiko", 90]]),
-  team("drx-22", "DRX", "DRX", 2022, 1, "#3D6CE0", [["Kingen", 89], ["Pyosik", 88], ["Zeka", 93], ["Deft", 92], ["BeryL", 91]]),
-  team("blg-24", "BLG", "BLG", 2024, 2, "#1F74B3", [["Bin", 94], ["XUN", 87], ["knight", 94], ["Elk", 91], ["ON", 88]]),
-  team("kt-25", "KT Rolster", "KT", 2025, 2, "#C02A21", [["PerfecT", 87], ["Cuzz", 88], ["Bdd", 90], ["deokdam", 89], ["Peter", 87]]),
-  team("wbg-23", "Weibo", "WBG", 2023, 2, "#A86A12", [["TheShy", 88], ["Weiwei", 86], ["Xiaohu", 89], ["Light", 87], ["Crisp", 87]]),
-  team("geng-24", "Gen.G", "GEN", 2024, 3, "#8A6F1E", [["Kiin", 91], ["Canyon", 90], ["Chovy", 94], ["Peyz", 90], ["Lehends", 89]]),
-  team("jdg-23", "JDG", "JDG", 2023, 3, "#B3202F", [["369", 90], ["Kanavi", 91], ["knight", 93], ["Ruler", 93], ["MISSING", 88]]),
-  team("g2-20", "G2", "G2", 2020, 3, "#5F6670", [["Wunder", 86], ["Jankos", 88], ["Caps", 91], ["Perkz", 89], ["Mikyx", 87]]),
-  team("dk-21", "DWG KIA", "DK", 2021, 3, "#16697A", [["Khan", 89], ["Canyon", 93], ["ShowMaker", 93], ["Ghost", 88], ["BeryL", 90]]),
-  team("t1-22", "T1", "T1", 2022, 2, "#C8102E", [["Zeus", 91], ["Oner", 89], ["Faker", 93], ["Gumayusi", 91], ["Keria", 93]]),
-  team("geng-22", "Gen.G", "GEN", 2022, 3, "#8A6F1E", [["Doran", 88], ["Peanut", 89], ["Chovy", 93], ["Ruler", 92], ["Lehends", 88]]),
-  team("jdg-22", "JDG", "JDG", 2022, 3, "#B3202F", [["369", 88], ["Kanavi", 90], ["Yagao", 88], ["Hope", 87], ["MISSING", 87]]),
-  team("blg-23", "BLG", "BLG", 2023, 3, "#1F74B3", [["Bin", 91], ["XUN", 87], ["Yagao", 88], ["Elk", 90], ["ON", 87]]),
-  team("wbg-24", "Weibo", "WBG", 2024, 3, "#A86A12", [["Breathe", 87], ["Tarzan", 89], ["Xiaohu", 89], ["Light", 88], ["Crisp", 87]])
-];
+export const MAYHEM_TEAMS: MayhemTeam[] = ROSTERS.map(([id, org, name, tag, year, place, color, players]) => ({
+  id,
+  org,
+  name,
+  tag,
+  year,
+  place,
+  color,
+  players: players.map(([n, ovr], i) => ({ name: n, ovr, role: MAYHEM_ROLES[i] }))
+}));
 export const MAYHEM_TEAM_BY_ID: Record<string, MayhemTeam> = Object.fromEntries(MAYHEM_TEAMS.map((t) => [t.id, t]));
+
+/** Écusson d'équipe : choisi par le joueur (nom modifiable), porté par les bots. */
+export interface MayhemCrest {
+  /** Identifiant de l'écusson (logo /mayhem/logos/<id>.png). */
+  id: string;
+  name: string;
+  tag: string;
+  color: string;
+}
+export const MAYHEM_CRESTS: MayhemCrest[] = CRESTS;
+export const MAYHEM_CREST_BY_ID: Record<string, MayhemCrest> = Object.fromEntries(CRESTS.map((c) => [c.id, c]));
+export const crestLogo = (id: string) => `/mayhem/logos/${id}.png`;
+/** Nom d'équipe choisi par le joueur : 2 à 24 caractères. */
+export const MAYHEM_NAME_MAX = 24;
 
 export const MAYHEM_JOKERS = 3;
 /** Plafond du bonus de liens d'équipe. */
@@ -96,7 +100,7 @@ export interface MayhemRating {
   rating: number;
 }
 
-export const mayhemLabel = (t: MayhemTeam) => `${t.org} ${t.year}`;
+export const mayhemLabel = (t: MayhemTeam) => `${t.name} ${t.year}`;
 export const pickedPlayer = (p: MayhemPick) => MAYHEM_TEAM_BY_ID[p.t]?.players[p.i];
 
 export function mayhemRating(picks: MayhemPicks): MayhemRating {
@@ -128,6 +132,9 @@ export function mayhemRating(picks: MayhemPicks): MayhemRating {
 
 /** Une équipe historique complète, notée comme une équipe draftée. */
 export const rosterPicks = (t: MayhemTeam): MayhemPicks => Object.fromEntries(MAYHEM_ROLES.map((r, i) => [r, { t: t.id, i }]));
+
+/** Compositions de vrais matchs des Worlds 2023-2025 : [bleu, rouge], champions de top à support. */
+export const MAYHEM_COMPS: [string[], string[]][] = COMPS;
 
 /** Pools de champions par poste (identifiants Data Dragon allégés) pour les matchs simulés. */
 export const MAYHEM_CHAMPS: Record<MayhemRole, string[]> = {
@@ -182,6 +189,8 @@ export const RIFT = {
 export interface MayhemEntrant {
   /** « histo » : roster complet (anciens tournois) ; « bot » : équipe draftée par un bot. */
   kind: "me" | "friend" | "histo" | "bot";
+  /** Écusson et nom affichés (le joueur choisit les siens, les bots portent ceux d'une vraie équipe). */
+  crest?: MayhemCrest;
   /** Joueur du site (moi ou un ami du groupe). */
   userId?: string;
   /** Équipe historique qui complète le tableau. */

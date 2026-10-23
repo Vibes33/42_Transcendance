@@ -356,8 +356,8 @@ export function createJeuxApp(deps: JeuxDeps) {
       const ready = members.filter((m) => m.locked);
       if (!tournament && ready.length > 0 && members.every((m) => m.locked || m.gone)) {
         const order = shuffle(ready.map((m) => m.userId), rng(params.sessionId + ":tableau")).slice(0, MAYHEM_ENTRANTS);
-        const entrants: MayhemEntrant[] = order.map((u) => ({ kind: "friend", userId: u, picks: stateOf(u)!.picks, rating: mayhemRating(stateOf(u)!.picks).rating }));
-        tournament = simulateTournament(params.sessionId + ":" + order.map((u) => latest.get(u)!.id).join(","), [...entrants, ...botFill(params.sessionId, MAYHEM_ENTRANTS - entrants.length)]);
+        const entrants: MayhemEntrant[] = order.map((u) => ({ kind: "friend", userId: u, picks: stateOf(u)!.picks, rating: mayhemRating(stateOf(u)!.picks).rating, crest: stateOf(u)!.crest ?? undefined }));
+        tournament = simulateTournament(params.sessionId + ":" + order.map((u) => latest.get(u)!.id).join(","), [...entrants, ...botFill(params.sessionId, MAYHEM_ENTRANTS - entrants.length, entrants.flatMap((e) => (e.crest ? [e.crest.id] : [])))]);
         for (const u of order) {
           const r = latest.get(u)!;
           const st = r.state as MayhemState;
@@ -377,7 +377,7 @@ export function createJeuxApp(deps: JeuxDeps) {
           const u = requireAccount(caller);
           ids = new Set([u, ...((await deps.friends?.(u)) ?? [])]);
         }
-        const best = new Map<string, { userId: string; rating: number; wins: number; score: number; picks: MayhemState["picks"]; at: number }>();
+        const best = new Map<string, { userId: string; rating: number; wins: number; score: number; picks: MayhemState["picks"]; crest: MayhemState["crest"]; at: number }>();
         const rows = db.select().from(rounds).where(and(eq(rounds.game, "mayhem"), eq(rounds.day, day), eq(rounds.over, true), eq(rounds.kind, "user"))).all();
         for (const r of rows) {
           if (ids && !ids.has(r.userId)) continue;
@@ -388,14 +388,14 @@ export function createJeuxApp(deps: JeuxDeps) {
           const wins = res?.wins ?? 0;
           const score = rating + 2 * wins;
           const cur = best.get(r.userId);
-          if (!cur || score > cur.score || (score === cur.score && (r.finishedAt ?? 0) < cur.at)) best.set(r.userId, { userId: r.userId, rating, wins, score, picks: st.picks, at: r.finishedAt ?? 0 });
+          if (!cur || score > cur.score || (score === cur.score && (r.finishedAt ?? 0) < cur.at)) best.set(r.userId, { userId: r.userId, rating, wins, score, picks: st.picks, crest: st.crest ?? null, at: r.finishedAt ?? 0 });
         }
         const sorted = [...best.values()].sort((a, b) => b.score - a.score || a.at - b.at);
         const top = sorted.slice(0, 10);
         const myIdx = me ? sorted.findIndex((x) => x.userId === me) : -1;
         const wanted = [...new Set([...top.map((x) => x.userId), ...(myIdx >= 0 ? [me!] : [])])];
         const profiles = Object.fromEntries(((await deps.players?.(wanted).catch(() => [])) ?? []).map((p) => [p.userId, p]));
-        const row = (x: (typeof sorted)[number], i: number) => ({ rank: i + 1, player: profiles[x.userId] ?? null, rating: x.rating, wins: x.wins, score: x.score });
+        const row = (x: (typeof sorted)[number], i: number) => ({ rank: i + 1, player: profiles[x.userId] ?? null, crest: x.crest, rating: x.rating, wins: x.wins, score: x.score });
         const lead = sorted[0];
         return {
           day,

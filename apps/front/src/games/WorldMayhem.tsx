@@ -6,6 +6,7 @@ import { useT } from "../i18n";
 import { useMe } from "../state/app";
 import { useLive } from "../state/live";
 import { Bracket } from "./mayhem/Bracket";
+import { CrestPicker } from "./mayhem/CrestPicker";
 import { Broadcast } from "./mayhem/Broadcast";
 import { Draft } from "./mayhem/Draft";
 import { Groups } from "./mayhem/Groups";
@@ -34,9 +35,14 @@ export function WorldMayhem({ round, act, flow, groupSize }: GameProps<MayhemPub
   const [rolling, setRolling] = useState<string | null>(null);
   const [groupTour, setGroupTour] = useState<{ tour: MayhemTournament; me: number } | null>(null);
   const [members, setMembers] = useState<{ userId: string; locked: boolean; gone: boolean }[]>([]);
-  const [view, setView] = useState<{ step: number; watching: boolean }>({ step: 0, watching: false });
-  const [skipped, setSkipped] = useState(false);
+  // Le parcours reprend là où il en était (enregistré côté serveur) après une sortie ou un rechargement
+  const [view, setView] = useState<{ step: number; watching: boolean }>({ step: pub.watched ?? 0, watching: false });
   const [tab, setTab] = useState<"groups" | "bracket" | null>(null);
+  // Mon parcours fini, je peux dévoiler le tournoi complet (et alors regarder n'importe quel match)
+  const [spec, setSpec] = useState<{ key: string; match: MayhemMatch; game: number; label: string } | null>(null);
+  useEffect(() => {
+    if (view.step > (pub.watched ?? 0) && !round.over) act({ type: "watched", step: view.step }).catch(() => {});
+  }, [view.step, pub.watched, round.over, act]);
   const rollTimer = useRef<ReturnType<typeof setInterval>>(undefined);
   useEffect(() => () => clearInterval(rollTimer.current), []);
 
@@ -103,16 +109,21 @@ export function WorldMayhem({ round, act, flow, groupSize }: GameProps<MayhemPub
   }, [tour, myGroup, mine]);
 
   const stageName = (ri: number) => [t("Quart de finale"), t("Demi-finale"), t("Finale")][ri];
-  const done = skipped || view.step >= steps.length;
-  // Ce qui a été regardé se dévoile : journées de poule, puis tours de la phase finale
+  const done = view.step >= steps.length;
+  // Ce qui a été regardé se dévoile : journées de poule, puis tours de la phase finale. Rien au-dessus
+  // de mon tour n'est rempli d'avance : après mon parcours, la suite se dévoile tour par tour.
   const days = done ? MAYHEM_GROUP_DAYS : Math.min(MAYHEM_GROUP_DAYS, steps.slice(0, view.step).filter((s) => s.kind === "group").length);
   const groupsDone = days >= MAYHEM_GROUP_DAYS;
   const roundShown = (ri: number) => {
     const idx = steps.map((s, i) => (s.kind === "bracket" && s.index === ri ? i : -1)).filter((i) => i >= 0);
     return idx.length > 0 && idx[idx.length - 1] < view.step;
   };
-  const shown = done ? 3 : [0, 1, 2].filter(roundShown).length;
+  // Le tournoi avance avec moi : un tour se remplit quand j'ai joué (ou passé) mon match du tour d'avant
+  // Mon parcours fini (éliminé ou champion), le tournoi se met à jour tout seul jusqu'au bout
+  const finished = done;
+  const shown = finished ? 3 : [0, 1, 2].filter(roundShown).length;
   const known = groupsDone ? Math.min(3, shown + 1) : 0;
+  const revealed = (ri: number) => ri < shown;
 
   const stepLabel = (s: Step) => {
     if (s.kind === "group") return t("Poule {g} · journée {n}", { g: myGroup!.name, n: s.index + 1 });
@@ -133,6 +144,8 @@ export function WorldMayhem({ round, act, flow, groupSize }: GameProps<MayhemPub
       {children}
     </div>
   );
+
+  if (!pub.locked && !pub.crest) return shell(<CrestPicker busy={busy} onConfirm={(id, name) => send({ type: "crest", id, name })} />);
 
   if (!pub.locked) return shell(<Draft pub={pub} busy={busy} rolling={rolling} onPick={(i) => send({ type: "pick", index: i }, true)} onReroll={() => send({ type: "reroll" }, true)} onLock={() => send({ type: "lock" })} />);
 
@@ -160,6 +173,26 @@ export function WorldMayhem({ round, act, flow, groupSize }: GameProps<MayhemPub
   const qualified = myGroup.standings.slice(0, 2).includes(mine);
   const finalWins = tour.rounds.flat().filter((m) => m.winner === mine).length;
   const place = tour.champion === mine ? t("Champion") : !qualified ? t("Phase de poules") : finalWins === 2 ? t("Finaliste") : finalWins === 1 ? t("Demi-finale") : t("Quart de finale");
+
+  // Match d'autres équipes, lancé depuis les poules ou l'arbre
+  if (spec) {
+    const last = spec.game >= spec.match.games.length - 1;
+    const back = () => setSpec(null);
+    return shell(
+      <Broadcast
+        key={spec.key + spec.game}
+        tour={tour}
+        game={spec.match.games[spec.game]}
+        mine={mine}
+        names={names}
+        myId={myId}
+        stage={spec.label + (spec.match.bo > 1 ? ` · ${t("partie {n}", { n: spec.game + 1 })}` : "")}
+        autoReturn={last}
+        next={last ? { label: t("Retour au tournoi"), go: back } : { label: t("Partie suivante"), go: () => setSpec({ ...spec, game: spec.game + 1 }) }}
+        overview={{ label: t("Retour au tournoi"), go: back }}
+      />
+    );
+  }
 
   // Retransmission d'une partie
   if (view.watching && !done) {
@@ -189,6 +222,28 @@ export function WorldMayhem({ round, act, flow, groupSize }: GameProps<MayhemPub
 
   // Vue d'ensemble : poules puis arbre, et mon parcours
   const next = steps[view.step];
+  // Passer la phase en cours seulement (les poules, ou le tour de l'arbre où j'en suis), puis continuer
+  const skipPhase = () => {
+    if (!next) return;
+    const after = steps.findIndex((s, i) => i > view.step && (next.kind === "group" ? s.kind === "bracket" : s.kind === "bracket" && s.index > next.index));
+    const step = after < 0 ? steps.length : after;
+    setView({ step, watching: false });
+    setTab(steps[step]?.kind === "group" ? "groups" : step >= steps.length && !myGroup.standings.slice(0, 2).includes(mine) ? "groups" : "bracket");
+  };
+  // Pendant mon parcours, seul mon prochain match se regarde ; une fois le tournoi complet dévoilé, tous
+  const canWatch = (ri: number, mi: number) => {
+    const m = tour.rounds[ri][mi];
+    return finished || ((m.a === mine || m.b === mine) && !revealed(ri) && next?.kind === "bracket" && next.index === ri);
+  };
+  const watchBracket = (ri: number, mi: number) => {
+    const m = tour.rounds[ri][mi];
+    if (!finished) return setView({ step: view.step, watching: true });
+    setSpec({ key: `b${ri}-${mi}`, match: m, game: 0, label: `${stageName(ri)} · Bo${m.bo}` });
+  };
+  const watchGroup = (gi: number, mi: number) => {
+    const g = tour.groups[gi];
+    setSpec({ key: `g${g.name}-${mi}`, match: g.matches[mi], game: 0, label: t("Poule {g} · journée {n}", { g: g.name, n: Math.floor(mi / 2) + 1 }) });
+  };
   const shownTab = tab ?? (done ? (qualified ? "bracket" : "groups") : next?.kind === "group" ? "groups" : "bracket");
   const myMatch = (ri: number) => tour.rounds[ri].find((x) => x.a === mine || x.b === mine);
   const opponentOf = (m: MayhemMatch) => entrantName(t, tour.entrants[m.a === mine ? m.b : m.a], names, myId);
@@ -203,10 +258,10 @@ export function WorldMayhem({ round, act, flow, groupSize }: GameProps<MayhemPub
     ...[0, 1, 2].map((ri) => {
       const m = myMatch(ri);
       const reached = ri < known && !!m;
-      const seen = ri < shown && !!m;
+      const seen = !!m && (ri < shown || (m.a === mine || m.b === mine ? roundShown(ri) : false));
       return {
         title: stageName(ri),
-        detail: !groupsDone || ri >= known ? t("Si tu passes le tour précédent") : !m ? t("Pas qualifié") : seen ? t("{score} contre {team}", { score: `${m.a === mine ? m.wins[0] : m.wins[1]}–${m.a === mine ? m.wins[1] : m.wins[0]}`, team: opponentOf(m) }) : t("Contre {team}", { team: opponentOf(m) }),
+        detail: done && !m ? t("Pas qualifié") : !groupsDone || ri >= known ? t("Si tu passes le tour précédent") : !m ? t("Pas qualifié") : seen ? t("{score} contre {team}", { score: `${m.a === mine ? m.wins[0] : m.wins[1]}–${m.a === mine ? m.wins[1] : m.wins[0]}`, team: opponentOf(m) }) : t("Contre {team}", { team: opponentOf(m) }),
         state: (seen ? (m!.winner === mine ? "won" : "lost") : reached ? "todo" : "todo") as "won" | "lost" | "todo"
       };
     })
@@ -223,7 +278,7 @@ export function WorldMayhem({ round, act, flow, groupSize }: GameProps<MayhemPub
               </button>
             ))}
           </div>
-          <div className="flex-1 min-h-0">{shownTab === "groups" ? <Groups tour={tour} mine={mine} names={names} myId={myId} days={days} /> : <Bracket tour={tour} mine={mine} names={names} myId={myId} known={known} shown={shown} />}</div>
+          <div className="flex-1 min-h-0">{shownTab === "groups" ? <Groups tour={tour} mine={mine} names={names} myId={myId} days={days} onWatch={finished ? watchGroup : undefined} /> : <Bracket tour={tour} mine={mine} names={names} myId={myId} known={known} revealed={revealed} canWatch={canWatch} onWatch={watchBracket} />}</div>
         </section>
         <aside aria-label={t("Ton parcours")} className="min-h-0 flex flex-col">
           <div className="p-[1.5px] bg-acc cut-md">
@@ -249,14 +304,15 @@ export function WorldMayhem({ round, act, flow, groupSize }: GameProps<MayhemPub
               ) : (
                 <>
                   <span className="font-d font-bold text-2xl">{tour.champion === mine ? t("Champion du World Mayhem !") : t("Éliminé : {place}", { place: place.toLowerCase() })}</span>
+                  <span className="text-[13px] text-mut text-center">{t("Clique un match de l’arbre ou des poules pour le regarder.")}</span>
                   <button type="button" onClick={() => send({ type: "done" })} disabled={busy || round.over} className="h-[52px] border-0 para bg-acc text-on-acc cursor-pointer font-d font-bold text-[15px] tracking-[0.05em] uppercase">
                     {t("Voir les résultats")}
                   </button>
                 </>
               )}
-              {!done && (
-                <button type="button" className="tl self-center min-h-11 text-sm" onClick={() => setSkipped(true)}>
-                  {t("Passer les matchs")}
+              {!done && next && (
+                <button type="button" className="tl self-center min-h-11 text-sm" onClick={skipPhase}>
+                  {next.kind === "group" ? t("Passer la phase de poules") : t("Passer le match : {stage}", { stage: stageName(next.index).toLowerCase() })}
                 </button>
               )}
             </div>

@@ -1,24 +1,25 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { MAYHEM_ROLE_LABEL, MAYHEM_TEAM_BY_ID, type MayhemRole } from "@loltr/content/lite";
+import { MAYHEM_ROLE_LABEL, MAYHEM_TEAM_BY_ID, type MayhemCrest, type MayhemRole } from "@loltr/content/lite";
 import { CLASSIC_UNLOCK_PRICE, type PublicPlayer } from "@loltr/shared";
 import { get, post } from "../api/client";
 import { keys, useInventory, useInvalidate } from "../api/queries";
 import { Shard } from "../components/icons";
-import { Pill, glow } from "../components/ui";
-import { Head } from "../games/mayhem/util";
+import { glow } from "../components/ui";
+import { CrestLogo, Head } from "../games/mayhem/util";
 import { fmt, useT } from "../i18n";
 import { partieUrl, startGroup } from "../lib/play";
 import { useMe } from "../state/app";
 import { useUi } from "../state/ui";
 
-// World Mayhem, avant la partie : l'équipe du jour, le classement du jour, et le choix entre un
+// World Mayhem, avant la partie : l'équipe du jour et le choix entre un
 // tournoi solo (contre des équipes historiques) ou entre amis (le groupe, complété au besoin).
 
 interface DayRow {
   rank: number;
   player: PublicPlayer | null;
+  crest: MayhemCrest | null;
   rating: number;
   wins: number;
   score: number;
@@ -39,9 +40,8 @@ export function Mayhem() {
   const invalidate = useInvalidate();
   const inv = useInventory(me.isUser);
   const [mode, setMode] = useState<"solo" | "amis">(me.inGroup ? "amis" : "solo");
-  const [scope, setScope] = useState<"mondial" | "copains">("mondial");
   const [busy, setBusy] = useState(false);
-  const day = useQuery({ queryKey: ["mayhem-day", scope], queryFn: () => get<DayData>(`/api/jeux/mayhem/day?scope=${scope}`), enabled: scope === "mondial" || me.isUser });
+  const day = useQuery({ queryKey: ["mayhem-day", "mondial"], queryFn: () => get<DayData>("/api/jeux/mayhem/day?scope=mondial") });
   const owned = (inv.data ?? []).includes("game:mayhem");
   const best = day.data?.best ?? null;
 
@@ -117,7 +117,7 @@ export function Mayhem() {
           </div>
         </section>
 
-        <aside aria-label={t("Équipe du jour")} className="flex-[0_1_520px] min-w-[300px] flex flex-col gap-4">
+        <aside aria-label={t("Équipe du jour")} className="flex-[0_1_520px] min-w-[300px] self-center flex flex-col">
           <div className="p-[2px] bg-acc cut-lg" style={{ filter: "drop-shadow(0 18px 40px color-mix(in srgb, var(--acc) 22%, transparent))" }}>
             <div className="flex flex-col gap-3 py-5 px-6 cut-lg" style={{ background: "linear-gradient(180deg, color-mix(in srgb, var(--acc) 16%, var(--surf)), var(--surf))" }}>
               <div className="flex items-center justify-between gap-3">
@@ -127,9 +127,10 @@ export function Mayhem() {
               {best ? (
                 <>
                   <div className="flex items-center gap-3.5">
-                    <div className="flex-auto flex flex-col">
-                      <strong className="font-d text-[26px]">{best.player?.pseudo ?? "?"}</strong>
-                      <span className="text-sm text-mut">{t("{w} victoire(s) · score {s}", { w: best.wins, s: best.score })}</span>
+                    {best.crest && <CrestLogo crest={best.crest} className="basis-14 shrink-0 w-14 h-14" />}
+                    <div className="flex-auto min-w-0 flex flex-col">
+                      <strong className="font-d text-[26px] leading-tight truncate">{best.crest?.name ?? best.player?.pseudo ?? "?"}</strong>
+                      <span className="text-sm text-mut truncate">{t("{player} · {w} victoire(s) · score {s}", { player: best.player?.pseudo ?? "?", w: best.wins, s: best.score })}</span>
                     </div>
                     <div className="flex flex-col items-end">
                       <span className="font-d font-bold text-5xl leading-none text-acc">{best.rating}</span>
@@ -157,37 +158,8 @@ export function Mayhem() {
               ) : (
                 <span className="text-[15px] leading-normal text-mut">{t("Personne n’a encore fini de tournoi aujourd’hui : la première équipe sera mise en avant ici.")}</span>
               )}
-              <span className="text-[13px] leading-normal text-mut">{t("Classement du jour : note d’équipe + 2 points par victoire en tournoi.")}</span>
+              <span className="text-[13px] leading-normal text-mut">{t("Meilleur score du jour : note d’équipe + 2 points par victoire en tournoi.")}</span>
             </div>
-          </div>
-          <div className="flex flex-col gap-2.5 py-[18px] px-5 bg-surf cut-md">
-            <div className="flex items-center justify-between gap-3">
-              <span className="label">{t("Classement du jour")}</span>
-              <div role="group" aria-label={t("Choisir le classement")} className="flex gap-1.5">
-                <Pill on={scope === "mondial"} onClick={() => setScope("mondial")} className="!px-4 !text-[13px]">
-                  {t("Mondial")}
-                </Pill>
-                <Pill on={scope === "copains"} onClick={() => (me.isUser ? setScope("copains") : ui.askLogin("amis"))} className="!px-4 !text-[13px]">
-                  {t("Copains")}
-                </Pill>
-              </div>
-            </div>
-            {(day.data?.rows.length ?? 0) === 0 && <span className="text-sm text-mut">{t("Aucun score aujourd’hui.")}</span>}
-            <ol className="m-0 p-0 list-none flex flex-col gap-1">
-              {[...(day.data?.rows ?? []), ...(day.data?.me && day.data.me.rank > (day.data.rows.length ?? 0) ? [day.data.me] : [])].map((r) => {
-                const mine = r.player?.userId === me.profile?.userId;
-                return (
-                  <li key={r.rank} className="flex items-center gap-3 h-11 px-3.5 cut-sm" style={{ background: mine ? "color-mix(in srgb, var(--acc) 16%, var(--surf2))" : "var(--surf2)" }}>
-                    <span className="basis-[34px] shrink-0 font-d font-bold text-mut">{r.rank}</span>
-                    <strong className="flex-auto text-[15px] truncate">{r.player?.pseudo ?? "?"}</strong>
-                    <span className="text-[13px] text-mut">{t("Note {n} · {w} V", { n: r.rating, w: r.wins })}</span>
-                    <span className="basis-11 shrink-0 text-right font-d font-bold" style={{ color: mine ? "var(--acc)" : "var(--ink)" }}>
-                      {r.score}
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
           </div>
         </aside>
       </main>

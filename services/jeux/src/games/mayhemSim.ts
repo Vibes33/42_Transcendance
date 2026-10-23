@@ -1,6 +1,7 @@
 import { rng, shuffle } from "@loltr/shared";
 import {
   MAYHEM_CHAMPS,
+  MAYHEM_COMPS,
   MAYHEM_ROLES,
   MAYHEM_TEAMS,
   RIFT,
@@ -36,8 +37,15 @@ function simGame(r: R, blue: number, red: number, ra: number, rb: number): Mayhe
   const W: Side = blueWins ? "a" : "b";
   const duration = Math.max(1320, Math.round(1500 + r() * 600 - Math.abs(ra - rb) * 12));
   const side = (p: number): Side => (r() < p ? W : other(W));
-  const champs = { a: MAYHEM_ROLES.map((role) => pick(r, MAYHEM_CHAMPS[role])), b: [] as string[] };
-  champs.b = MAYHEM_ROLES.map((role, i) => pick(r, MAYHEM_CHAMPS[role].filter((c) => c !== champs.a[i])));
+  // Compositions de vrais matchs récents des Worlds (côtés tirés au hasard) ; à défaut, des pools par poste
+  let champs: { a: string[]; b: string[] };
+  if (MAYHEM_COMPS.length) {
+    const [x, y] = pick(r, MAYHEM_COMPS);
+    champs = r() < 0.5 ? { a: [...x], b: [...y] } : { a: [...y], b: [...x] };
+  } else {
+    const a = MAYHEM_ROLES.map((role) => pick(r, MAYHEM_CHAMPS[role]));
+    champs = { a, b: MAYHEM_ROLES.map((role, i) => pick(r, MAYHEM_CHAMPS[role].filter((c) => c !== a[i]))) };
+  }
   const kda = { a: MAYHEM_ROLES.map(() => [0, 0, 0] as [number, number, number]), b: MAYHEM_ROLES.map(() => [0, 0, 0] as [number, number, number]) };
   const events: MayhemEvent[] = [];
   const towersDown = { a: 0, b: 0 };

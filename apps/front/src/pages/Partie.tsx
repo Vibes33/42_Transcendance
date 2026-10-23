@@ -139,11 +139,25 @@ export function Partie() {
     [round?.id]
   );
 
+  // World Mayhem : quitter la page (bouton, menu du haut, retour arrière) abandonne la partie, la
+  // prochaine repart d'un draft vierge. Recharger la page la reprend (pas de démontage dans ce cas).
+  const mayhemOpen = useRef<RoundState | null>(null);
+  mayhemOpen.current = round && round.game === "mayhem" && round.context === "classique" && !round.over ? round : null;
+  const abandonMayhem = () => {
+    const r = mayhemOpen.current;
+    mayhemOpen.current = null;
+    return r ? post(`/api/jeux/rounds/${r.id}/finish`, { quit: true }).catch(() => {}) : Promise.resolve();
+  };
+  useEffect(() => () => void abandonMayhem(), []);
+
   const quit = async () => {
     if (ctx === "classique" && game) rememberGameKey(game);
+    // World Mayhem : on revient à son menu
+    const mayhem = ctx === "classique" && game === "mayhem";
+    await abandonMayhem();
     if (session?.kind === "group") await post(`/api/temps-reel/sessions/${session.id}/leave`).catch(() => {});
     if (session) useLive.getState().setSession(null);
-    nav(ctx === "classique" ? "/jeux" : ctx === "streamer" ? "/stream" : "/");
+    nav(mayhem ? "/mayhem" : ctx === "classique" ? "/jeux" : ctx === "streamer" ? "/stream" : "/");
   };
 
   const rank = ctx === "defi" && daily && game ? daily.games.findIndex((g) => g.key === game) + 1 : 1;

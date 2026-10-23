@@ -143,12 +143,12 @@ export function Accueil() {
                 <span className="text-[13.5px] text-mut">{t("jouable sans limite en mode classique")}</span>
               </div>
             )}
-            <div className="flex flex-wrap items-end gap-x-10 gap-y-4 pt-[22px] border-t border-line self-stretch">
+            <div className="flex flex-wrap items-end gap-x-8 gap-y-4 pt-[22px] border-t border-line self-stretch">
               <Stat label={t("Série en cours")} value={t("{n} " + plural(me.streak, "jour", "jours"), { n: me.streak })} />
               <Stat label={t("Points du jour")} value={fmt(daily?.projectedTotal ?? 0)} hint={t("prévisionnels")} />
               <Stat label={t("Nouvelle rotation dans")} value={daily ? hoursMinutes(daily.nextRotationAt - now) : "—"} />
               {!me.isAnon && (
-                <button type="button" className="tl ml-auto min-h-11 text-[15px]" onClick={() => nav("/historique")}>
+                <button type="button" className="tl min-h-11 text-[15px]" onClick={() => nav("/historique")}>
                   {t("Historique")}
                 </button>
               )}

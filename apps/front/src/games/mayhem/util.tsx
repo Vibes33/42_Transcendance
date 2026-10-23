@@ -4,6 +4,8 @@ import {
   MAYHEM_TEAM_BY_ID,
   RIFT,
   mayhemLabel,
+  crestLogo,
+  type MayhemCrest,
   type MayhemEntrant,
   type MayhemEvent,
   type MayhemPicks,
@@ -16,6 +18,8 @@ import type { useT } from "../../i18n";
 // World Mayhem côté interface : données de la manche, têtes des joueurs, carte de la Faille.
 
 export interface MayhemPub {
+  /** Écusson et nom choisis avant le draft (null : à choisir). */
+  crest: MayhemCrest | null;
   current: string | null;
   picks: MayhemPicks;
   jokers: number;
@@ -24,6 +28,8 @@ export interface MayhemPub {
   group: boolean;
   tournament: MayhemTournament | null;
   me: number;
+  /** Parties de mon parcours déjà regardées ou passées. */
+  watched: number;
   rating: MayhemRating;
   over: boolean;
 }
@@ -77,8 +83,9 @@ export function captainOf(picks: MayhemPicks) {
     .sort((x, y) => y.ovr - x.ovr)[0];
 }
 
-/** Nom affiché d'un participant du tournoi. */
+/** Nom affiché d'un participant du tournoi : son nom d'équipe (écusson), sinon un nom par défaut. */
 export function entrantName(t: ReturnType<typeof useT>, e: MayhemEntrant, names: Record<string, string>, myId?: string): string {
+  if (e.crest) return e.crest.name;
   if (e.kind === "histo") return mayhemLabel(MAYHEM_TEAM_BY_ID[e.teamId!]);
   if (e.kind === "bot") return t("Équipe de {name}", { name: captainOf(e.picks)?.name ?? "?" });
   if (e.kind === "me" || (myId && e.userId === myId)) return t("Ton équipe");
@@ -86,16 +93,43 @@ export function entrantName(t: ReturnType<typeof useT>, e: MayhemEntrant, names:
 }
 
 export const entrantTag = (e: MayhemEntrant, names: Record<string, string>) =>
-  e.kind === "histo"
-    ? MAYHEM_TEAM_BY_ID[e.teamId!].tag
-    : e.kind === "bot"
-      ? (captainOf(e.picks)?.name ?? "?").slice(0, 3).toUpperCase()
-      : e.kind === "me"
-        ? "TOI"
-        : (names[e.userId!] ?? "?").slice(0, 3).toUpperCase();
+  e.crest
+    ? e.crest.tag
+    : e.kind === "histo"
+      ? MAYHEM_TEAM_BY_ID[e.teamId!].tag
+      : e.kind === "bot"
+        ? (captainOf(e.picks)?.name ?? "?").slice(0, 3).toUpperCase()
+        : e.kind === "me"
+          ? "TOI"
+          : (names[e.userId!] ?? "?").slice(0, 3).toUpperCase();
 
 export const entrantColor = (e: MayhemEntrant, myId?: string) =>
-  e.kind === "histo" ? MAYHEM_TEAM_BY_ID[e.teamId!].color : e.kind === "bot" ? (captainOf(e.picks)?.team.color ?? "#4B5563") : e.kind === "me" || e.userId === myId ? "var(--acc)" : "#4B5563";
+  e.crest ? e.crest.color : e.kind === "histo" ? MAYHEM_TEAM_BY_ID[e.teamId!].color : e.kind === "bot" ? (captainOf(e.picks)?.team.color ?? "#4B5563") : e.kind === "me" || e.userId === myId ? "var(--acc)" : "#4B5563";
+
+/** Logo d'un écusson, sans fond (sigle de l'équipe sur sa couleur si le logo manque). */
+export function CrestLogo({ crest, className = "" }: { crest: Pick<MayhemCrest, "id" | "tag" | "color">; className?: string }) {
+  const [missing, setMissing] = useState(false);
+  return (
+    <span className={`flex items-center justify-center ${missing ? "cut-sm" : ""} ${className}`} style={{ background: missing ? crest.color : undefined }}>
+      {missing ? (
+        <span className="font-d font-bold text-[11px] text-white">{crest.tag}</span>
+      ) : (
+        // Léger halo : les logos sombres (Gen.G, NRG…) restent lisibles sur le thème Ardoise
+        <img src={crestLogo(crest.id)} alt="" onError={() => setMissing(true)} className="block w-[90%] h-[90%] object-contain [filter:drop-shadow(0_0_1px_color-mix(in_srgb,var(--ink)_45%,transparent))]" />
+      )}
+    </span>
+  );
+}
+
+/** Badge d'un participant : son logo, sinon son sigle sur sa couleur. */
+export function CrestBadge({ entrant, names, myId, className = "" }: { entrant: MayhemEntrant; names: Record<string, string>; myId?: string; className?: string }) {
+  if (entrant.crest) return <CrestLogo crest={entrant.crest} className={className} />;
+  return (
+    <span className={`flex items-center justify-center cut-sm font-d font-bold text-[11px] text-white ${className}`} style={{ background: entrantColor(entrant, myId) }}>
+      {entrantTag(entrant, names)}
+    </span>
+  );
+}
 
 /** Titre et détail d'une action du match. */
 export function eventText(t: ReturnType<typeof useT>, e: MayhemEvent, side: { a: string; b: string }, players: { a: string[]; b: string[] }, champ: (s: "a" | "b", i: number) => string) {
