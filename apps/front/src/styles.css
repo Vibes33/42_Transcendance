@@ -358,3 +358,45 @@ input::placeholder {
 .chibi-float {
   animation: chibi-float 2.8s ease-in-out infinite alternate;
 }
+
+/* World Mayhem : poste libre qui pulse, signal d'action sur la carte, point « en direct » */
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.pulse {
+  animation: pulse-soft 1.6s ease-in-out infinite;
+}
+@keyframes ping {
+  from {
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 0.95;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(2.4);
+    opacity: 0;
+  }
+}
+.ping {
+  animation: ping 1.8s ease-out infinite;
+}
+@keyframes live {
+  50% {
+    opacity: 0.25;
+  }
+}
+.live {
+  animation: live 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse,
+  .ping,
+  .live {
+    animation: none;
+  }
+}

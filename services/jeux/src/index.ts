@@ -10,6 +10,8 @@ const app = createJeuxApp({
   owns: async (userId, item) => (await internal<{ owns: boolean }>("classement", `/api/classement/internal/owns?userId=${userId}&item=${encodeURIComponent(item)}`)).owns,
   groupOf: (userId) => internal<{ id: string; members: string[] } | null>("social", `/api/social/internal/group-of/${userId}`),
   session: (id) => internal<any>("temps-reel", `/api/temps-reel/internal/session/${id}`).catch(() => null),
+  players: (ids) => (ids.length ? internal<any[]>("profil", `/api/profil/internal/players?ids=${ids.join(",")}`) : Promise.resolve([])),
+  friends: async (userId) => (await internal<{ ids: string[] }>("social", `/api/social/internal/friends/${userId}`)).ids,
   projection: (userId, day) => internal<any>("classement", `/api/classement/internal/projection/${userId}/${day}`)
 });
 app.listen({ port: 3000, hostname: "0.0.0.0" });

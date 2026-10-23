@@ -51,6 +51,8 @@ function DayCard({ d }: { d: HistoryDay }) {
   const t = useT();
   const lang = useLang((s) => s.lang);
   const succeeded = d.games.filter((g) => g.base > 0).length;
+  // Bonus de percentile pas encore versé (jour non clos)
+  const pending = d.final ? 0 : d.games.reduce((s, g) => s + g.bonus, 0);
   return (
     <li className="p-[1.5px] bg-line cut-md">
       <div className="flex flex-col gap-3.5 px-5 py-4 bg-surf cut-md">
@@ -61,8 +63,12 @@ function DayCard({ d }: { d: HistoryDay }) {
           </span>
           {!d.completed && <span className="text-[13px] text-mut">{t("Défi incomplet")}</span>}
           <span className="ml-auto text-[13.5px] text-mut">{t("{n} " + plural(succeeded, "jeu réussi", "jeux réussis"), { n: succeeded })}</span>
-          <span className="font-d font-bold text-[22px] text-acc">{t("{n} pts", { n: fmt(d.total) })}</span>
+          <span className="flex flex-col items-end">
+            <span className="font-d font-bold text-[22px] text-acc">{t("{n} pts", { n: fmt(d.total) })}</span>
+            {pending > 0 && <span className="text-[12.5px] font-semibold text-warn">{t("dont +{n} en attente", { n: fmt(pending) })}</span>}
+          </span>
         </div>
+        {!d.final && <span className="-mt-1.5 text-[13px] text-mut">{t("Les points de classement (selon ton percentile) sont prévisionnels : ils sont versés à la clôture de la journée, le lendemain à 3:30.")}</span>}
         <ul className="m-0 p-0 list-none grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           {d.games.map((g) => (
             <li key={g.game} className="flex items-center gap-3 p-2 pr-3 bg-surf2 cut-sm">
@@ -74,8 +80,13 @@ function DayCard({ d }: { d: HistoryDay }) {
                 <span className="text-[12.5px] text-mut truncate">{resultLine(g)}</span>
                 <span className="flex items-baseline gap-2">
                   <span className={`font-d font-bold text-[13px] ${g.ranked ? "text-acc" : "text-mut"}`}>{topLabel(g.ranked ? g.top : null, g.players)}</span>
-                  <span className={`font-d font-bold text-[13px] ${g.projected > 0 ? "text-ok" : "text-mut"}`}>+{fmt(g.projected)}</span>
+                  {d.final ? (
+                    <span className={`font-d font-bold text-[13px] ${g.projected > 0 ? "text-ok" : "text-mut"}`}>+{fmt(g.projected)}</span>
+                  ) : (
+                    <span className={`font-d font-bold text-[13px] ${g.base > 0 ? "text-ok" : "text-mut"}`}>+{fmt(g.base)}</span>
+                  )}
                 </span>
+                {!d.final && g.bonus > 0 && <span className="font-d font-bold text-[12.5px] text-warn">{t("+{n} en attente", { n: fmt(g.bonus) })}</span>}
               </span>
             </li>
           ))}

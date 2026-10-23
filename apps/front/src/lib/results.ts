@@ -22,6 +22,8 @@ export function resultLine(g: Pick<HistoryGame, "game" | "result">): string {
       return t("{n} " + plural(r.champions ?? 0, "champion", "champions"), { n: r.champions ?? 0 });
     case "se":
       return t("{n} " + plural(r.correct ?? 0, "bonne réponse", "bonnes réponses"), { n: r.correct ?? 0 });
+    case "mayhem":
+      return t("Note {n}", { n: (r as { rating?: number }).rating ?? 0 });
   }
 }
 

@@ -519,5 +519,5 @@ export class Hub {
 }
 
 function summarize(r: RoundResult): LiveMember["results"][number]["summary"] {
-  return { tries: r.tries, found: r.found, skinFound: r.skinFound, champions: r.champions, correct: r.correct, durationMs: r.durationMs };
+  return { tries: r.tries, found: r.found, skinFound: r.skinFound, champions: r.champions, correct: r.correct, rating: r.rating, wins: r.wins, durationMs: r.durationMs };
 }

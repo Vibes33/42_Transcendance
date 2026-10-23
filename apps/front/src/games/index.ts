@@ -4,6 +4,7 @@ import { ChampionDuJour } from "./ChampionDuJour";
 import { MeliMelol } from "./MeliMelol";
 import { SortsEclair } from "./SortsEclair";
 import { SplashMystere } from "./SplashMystere";
+import { WorldMayhem } from "./WorldMayhem";
 import type { GameProps } from "./types";
 import type { TourStep } from "../components/Tutorial";
 
@@ -44,6 +45,14 @@ export const GAME_UI: Record<GameKey, { component: ComponentType<GameProps>; tut
       { target: "splash-image", title: "Un splash art caché", text: "L’image est très zoomée et floue. À chaque erreur, elle se dévoile un peu plus." },
       { target: "splash-steps", title: "Le zoom se dévoile", text: "Six crans de zoom : chaque erreur dézoome et défloute un peu l’image." },
       { target: "splash-input", title: "Champion, puis skin", text: "Le champion vaut 70 points. Ensuite, une seule tentative pour le skin, qui vaut 30 points." }
+    ]
+  },
+  mayhem: {
+    component: WorldMayhem,
+    tutorial: [
+      { target: "mayhem-draw", title: "Une équipe tirée au sort", text: "Une équipe des Worlds 2020 à 2025 est tirée : prends un de ses joueurs pour un poste libre. Une nouvelle équipe est tirée juste après." },
+      { target: "mayhem-map", title: "Un joueur par poste", text: "Tes joueurs prennent place sur la carte. Les joueurs d’un même roster se complètent : duo bot, mid-jungle…" },
+      { target: "mayhem-score", title: "Ta note d’équipe", text: "Elle combine la note des cartes et les liens. Valide ton équipe pour lancer un tournoi à 8 : quarts, demies, finale." }
     ]
   }
 };

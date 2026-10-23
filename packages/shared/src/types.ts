@@ -143,7 +143,7 @@ export interface LiveGameResult {
   basePoints: number;
   projected: number;
   /** Résumé sans spoiler : essais, score, trouvé… */
-  summary: { tries?: number; score?: number; found?: boolean; skinFound?: boolean; champions?: number; correct?: number; durationMs?: number } | null;
+  summary: { tries?: number; score?: number; found?: boolean; skinFound?: boolean; champions?: number; correct?: number; rating?: number; wins?: number; durationMs?: number } | null;
 }
 
 export interface LiveMember extends PublicPlayer {

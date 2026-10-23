@@ -4,6 +4,7 @@ import type { ChampionAttributes, Lang } from "./champions";
 
 export type { ChampionAttributes, Lang };
 export * from "./chibis";
+export * from "./mayhem";
 export { LABELS as ATTRIBUTE_LABELS } from "./attributes";
 
 export const DDRAGON = "https://ddragon.leagueoflegends.com";

@@ -74,7 +74,7 @@ export function Accueil() {
             </h1>
             <p className="m-0 max-w-[560px] text-[16.5px] leading-relaxed text-mut">
               {done
-                ? (dayChamp ? (found ? t("Bien joué, c’était {name}.", { name: dayChamp.names[namesLang] }) : t("Pas cette fois, c’était {name}.", { name: dayChamp.names[namesLang] })) + " " : "") +
+                ? (dayChamp && !found ? t("Pas cette fois, c’était {name}.", { name: dayChamp.names[namesLang] }) + " " : "") +
                   t("Ton classement sur chaque jeu est prévisionnel : il évolue au fil des parties des autres joueurs et devient définitif à {time}.", { time: rotationTime })
                 : t("Enchaîne les quatre jeux du jour d’une traite, seul ou en équipe avec tes amis. La rotation change chaque jour à {time}.", { time: rotationTime })}
             </p>

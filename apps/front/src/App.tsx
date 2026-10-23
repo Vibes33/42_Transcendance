@@ -18,6 +18,7 @@ import { Partie } from "./pages/Partie";
 import { Profil } from "./pages/Profil";
 import { Recap } from "./pages/Recap";
 import { Historique } from "./pages/Historique";
+import { Mayhem } from "./pages/Mayhem";
 import { Live, Obs, Stream } from "./pages/Stream";
 import { useApplyTheme, useMe } from "./state/app";
 import { connectLive, useLive } from "./state/live";
@@ -92,6 +93,7 @@ export function App() {
         <Route path="/partie" element={<Partie />} />
         <Route path="/recap" element={<Recap />} />
         <Route path="/historique" element={<Historique />} />
+        <Route path="/mayhem" element={<Mayhem />} />
         <Route path="/classement" element={<Classement />} />
         <Route path="/boutique" element={<Boutique />} />
         <Route path="/profil" element={<Profil />} />

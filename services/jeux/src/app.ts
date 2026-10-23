@@ -1,5 +1,6 @@
 import { Elysia, t } from "elysia";
 import { and, desc, eq, ne } from "drizzle-orm";
+import { MAYHEM_ENTRANTS, MAYHEM_ROLES, MAYHEM_TEAM_BY_ID, mayhemRating, type MayhemEntrant } from "@loltr/content";
 import {
   GAMES,
   basePoints,
@@ -7,15 +8,20 @@ import {
   forceCloseAt,
   nextRotationAt,
   randomSeed,
+  rng,
+  shuffle,
   type DailyState,
+  type PublicPlayer,
   type GameContext,
   type GameKey,
   type RoundState
 } from "@loltr/shared";
-import { callerPlugin, fail, health, internalGuard, requireSession, requireTester, type Caller, type EventMap, type EventType } from "@loltr/shared/server";
+import { callerPlugin, fail, health, internalGuard, requireAccount, requireSession, requireTester, type Caller, type EventMap, type EventType } from "@loltr/shared/server";
 import type { Db } from "./db";
 import { daily, rounds, seen } from "./schema";
 import { ENGINES } from "./games";
+import type { MayhemState } from "./games/mayhem";
+import { historicFill, simulateTournament } from "./games/mayhemSim";
 import { rotationFor } from "@loltr/shared";
 
 export interface JeuxDeps {
@@ -29,6 +35,10 @@ export interface JeuxDeps {
   session: (sessionId: string) => Promise<{ kind: "group" | "stream"; seed: string; members: string[]; game?: string | null } | null>;
   /** Points prévisionnels de la journée (service classement), au mieux. */
   projection: (userId: string, day: string) => Promise<Record<string, { base: number; projected: number; top?: number; ranked?: boolean; players?: number }>>;
+  /** Profils publics (pseudo, chibi), pour l'équipe du jour de World Mayhem. */
+  players?: (ids: string[]) => Promise<PublicPlayer[]>;
+  /** Amis d'un joueur (classement « copains »). */
+  friends?: (userId: string) => Promise<string[]>;
   fetchImage?: (url: string) => Promise<Response>;
   now?: () => number;
 }
@@ -236,6 +246,18 @@ export function createJeuxApp(deps: JeuxDeps) {
           if (!GAMES[game].classicPlayable) fail(403, "not_classic", "Ce jeu se joue uniquement dans le défi du jour.");
           if (caller.kind !== "user") fail(403, "account_required");
           if (!(await classicUnlocked(me, game))) fail(402, "locked", "Débloque ce jeu à la boutique pour y jouer en illimité.");
+          // World Mayhem dure plusieurs minutes : une page rechargée reprend le draft ou le tournoi en cours
+          if (game === "mayhem") {
+            const open = db
+              .select()
+              .from(rounds)
+              .where(and(eq(rounds.userId, me), eq(rounds.game, game), eq(rounds.over, false)))
+              .orderBy(desc(rounds.startedAt))
+              .all()
+              // Les tournois d'avant la phase de poules ne se reprennent pas
+              .find((r) => (r.sessionId ?? null) === (body.sessionId ?? null) && t - r.startedAt < 3 * 3600_000 && (!(r.state as MayhemState).tournament || !!(r.state as MayhemState).tournament!.groups));
+            if (open) return toState(open, t);
+          }
         } else {
           // Mode streamer : même contenu pour toute la session (graine partagée), jamais de points classés
           const s = body.sessionId ? await deps.session(body.sessionId) : null;
@@ -243,7 +265,7 @@ export function createJeuxApp(deps: JeuxDeps) {
           seed = s!.seed + ":" + game;
         }
         const engine = ENGINES[game];
-        const { state, contentKey } = engine.create({ seed, now: t, seen: body.context === "streamer" ? new Set() : seenSet(me, game) });
+        const { state, contentKey } = engine.create({ seed, now: t, seen: body.context === "streamer" ? new Set() : seenSet(me, game), group: body.context === "classique" && !!body.sessionId });
         const id = crypto.randomUUID();
         db.transaction((tx) => {
           tx.insert(rounds)
@@ -317,6 +339,82 @@ export function createJeuxApp(deps: JeuxDeps) {
       set.headers["cache-control"] = "private, max-age=600";
       return new Response(hit.body, { headers: { "content-type": hit.type, "cache-control": "private, max-age=600" } });
     })
+    // World Mayhem entre amis : le tournoi se lance quand tout le groupe a validé son équipe.
+    // Il est calculé une seule fois (graine de la session) puis rangé dans la manche de chacun.
+    .get("/mayhem/group/:sessionId", async ({ caller, params }) => {
+      const me = requireSession(caller);
+      const s = await deps.session(params.sessionId);
+      if (!s || !s.members.includes(me)) fail(403, "not_in_session");
+      const rows = db.select().from(rounds).where(and(eq(rounds.sessionId, params.sessionId), eq(rounds.game, "mayhem"))).orderBy(desc(rounds.startedAt)).all();
+      const latest = new Map<string, RoundRow>();
+      for (const r of rows) if (!latest.has(r.userId)) latest.set(r.userId, r);
+      const stateOf = (u: string) => latest.get(u)?.state as MayhemState | undefined;
+      // Un joueur qui a quitté la partie sans valider ne bloque pas le groupe
+      const members = s!.members.map((u) => ({ userId: u, locked: !!stateOf(u)?.locked, gone: !!latest.get(u)?.over && !stateOf(u)?.locked }));
+      let tournament = stateOf(me)?.tournament ?? null;
+      const ready = members.filter((m) => m.locked);
+      if (!tournament && ready.length > 0 && members.every((m) => m.locked || m.gone)) {
+        const order = shuffle(ready.map((m) => m.userId), rng(params.sessionId + ":tableau")).slice(0, MAYHEM_ENTRANTS);
+        const entrants: MayhemEntrant[] = order.map((u) => ({ kind: "friend", userId: u, picks: stateOf(u)!.picks, rating: mayhemRating(stateOf(u)!.picks).rating }));
+        tournament = simulateTournament(params.sessionId + ":" + order.map((u) => latest.get(u)!.id).join(","), [...entrants, ...historicFill(params.sessionId, MAYHEM_ENTRANTS - entrants.length)]);
+        for (const u of order) {
+          const r = latest.get(u)!;
+          const st = r.state as MayhemState;
+          if (!st.tournament) db.update(rounds).set({ state: { ...st, tournament, me: order.indexOf(u) } }).where(eq(rounds.id, r.id)).run();
+        }
+      }
+      return { members, tournament, me: tournament ? tournament.entrants.findIndex((e) => e.userId === me) : -1 };
+    })
+    // Équipe du jour : meilleur score du jour (note d'équipe + 2 points par victoire), mondial ou entre copains.
+    .get(
+      "/mayhem/day",
+      async ({ caller, query }) => {
+        const me = caller.id;
+        const day = dayKey(now());
+        let ids: Set<string> | null = null;
+        if (query.scope === "copains") {
+          const u = requireAccount(caller);
+          ids = new Set([u, ...((await deps.friends?.(u)) ?? [])]);
+        }
+        const best = new Map<string, { userId: string; rating: number; wins: number; score: number; picks: MayhemState["picks"]; at: number }>();
+        const rows = db.select().from(rounds).where(and(eq(rounds.game, "mayhem"), eq(rounds.day, day), eq(rounds.over, true), eq(rounds.kind, "user"))).all();
+        for (const r of rows) {
+          if (ids && !ids.has(r.userId)) continue;
+          const res = r.result as { rating?: number; wins?: number } | null;
+          const st = r.state as MayhemState;
+          if (!st.locked) continue;
+          const rating = res?.rating ?? 0;
+          const wins = res?.wins ?? 0;
+          const score = rating + 2 * wins;
+          const cur = best.get(r.userId);
+          if (!cur || score > cur.score || (score === cur.score && (r.finishedAt ?? 0) < cur.at)) best.set(r.userId, { userId: r.userId, rating, wins, score, picks: st.picks, at: r.finishedAt ?? 0 });
+        }
+        const sorted = [...best.values()].sort((a, b) => b.score - a.score || a.at - b.at);
+        const top = sorted.slice(0, 10);
+        const myIdx = me ? sorted.findIndex((x) => x.userId === me) : -1;
+        const wanted = [...new Set([...top.map((x) => x.userId), ...(myIdx >= 0 ? [me!] : [])])];
+        const profiles = Object.fromEntries(((await deps.players?.(wanted).catch(() => [])) ?? []).map((p) => [p.userId, p]));
+        const row = (x: (typeof sorted)[number], i: number) => ({ rank: i + 1, player: profiles[x.userId] ?? null, rating: x.rating, wins: x.wins, score: x.score });
+        const lead = sorted[0];
+        return {
+          day,
+          total: sorted.length,
+          best: lead
+            ? {
+                ...row(lead, 0),
+                team: MAYHEM_ROLES.filter((role) => lead.picks[role]).map((role) => {
+                  const p = lead.picks[role]!;
+                  const pl = MAYHEM_TEAM_BY_ID[p.t]?.players[p.i];
+                  return { role, teamId: p.t, name: pl?.name ?? "", ovr: pl?.ovr ?? 0 };
+                })
+              }
+            : null,
+          rows: top.map(row),
+          me: myIdx >= 0 ? row(sorted[myIdx], myIdx) : null
+        };
+      },
+      { query: t.Object({ scope: t.Optional(t.Union([t.Literal("mondial"), t.Literal("copains")])) }) }
+    )
     // Statistiques personnelles : tes points faibles, pour l'entraînement ciblé.
     .get("/stats", ({ caller }) => {
       const me = requireSession(caller);

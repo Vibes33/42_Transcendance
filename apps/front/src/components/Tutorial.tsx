@@ -78,11 +78,23 @@ export function Tutorial({ steps, onDone }: { steps: TourStep[]; onDone: () => v
   const next = () => (i + 1 < steps.length ? setI(i + 1) : onDone());
   const pad = 8;
   const box = rect ? { left: rect.left - pad, top: rect.top - pad, width: rect.width + 2 * pad, height: rect.height + 2 * pad } : null;
-  // La bulle se place sous l'élément, ou au-dessus s'il est en bas de l'écran
-  const below = box ? box.top + box.height + 220 < window.innerHeight : true;
-  const bubble: React.CSSProperties = box
-    ? { position: "fixed", left: Math.max(16, Math.min(window.innerWidth - 376, box.left)), top: below ? box.top + box.height + 14 : undefined, bottom: below ? undefined : window.innerHeight - box.top + 14, width: 360 }
-    : { position: "fixed", left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: "min(92vw, 440px)" };
+  // La bulle se place sous l'élément, sinon au-dessus, sinon à côté (grands panneaux), toujours dans l'écran
+  const W = 360;
+  const H = 230;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  let bubble: React.CSSProperties = { position: "fixed", left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: "min(92vw, 440px)" };
+  if (box) {
+    const left = Math.max(16, Math.min(vw - W - 16, box.left));
+    if (box.top + box.height + 14 + H < vh) bubble = { position: "fixed", left, top: box.top + box.height + 14, width: W };
+    else if (box.top - 14 - H > 0) bubble = { position: "fixed", left, bottom: vh - box.top + 14, width: W };
+    else {
+      const top = Math.max(16, Math.min(vh - H - 16, box.top));
+      if (box.left + box.width + 14 + W < vw) bubble = { position: "fixed", left: box.left + box.width + 14, top, width: W };
+      else if (box.left - 14 - W > 0) bubble = { position: "fixed", left: box.left - 14 - W, top, width: W };
+      else bubble = { position: "fixed", left: Math.max(16, (vw - W) / 2), bottom: 16, width: W };
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-labelledby="titre-tuto">

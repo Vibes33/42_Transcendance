@@ -230,9 +230,10 @@ function liveScore(game: GameKey, m: LiveMember, index: number, progress: LiveMe
     const s = r.summary;
     if (game === "meli") return { v: s?.champions ?? 0, done: true, ok: (s?.champions ?? 0) > 0, tries: 0 };
     if (game === "se") return { v: s?.correct ?? 0, done: true, ok: (s?.correct ?? 0) > 0, tries: 0 };
+    if (game === "mayhem") return { v: (s?.rating ?? 0) + 2 * (s?.wins ?? 0), done: true, ok: true, tries: 0 };
     return { v: s?.found ? 1 : 0, done: true, ok: !!s?.found, tries: s?.tries ?? 99 };
   }
-  if (game === "meli" || game === "se") return { v: p?.score ?? 0, done: false, ok: (p?.score ?? 0) > 0, tries: 0 };
+  if (game === "meli" || game === "se" || game === "mayhem") return { v: p?.score ?? 0, done: false, ok: (p?.score ?? 0) > 0, tries: 0 };
   return { v: p?.found ? 1 : 0, done: false, ok: !!p?.found, tries: p?.tries ?? 0 };
 }
 

@@ -1,4 +1,4 @@
-import { LITE_BY_ID, LITE_CHAMPIONS, spellImg, splashImg, type ChampionAttributes } from "@loltr/content/lite";
+import { LITE_BY_ID, LITE_CHAMPIONS, mayhemRating, spellImg, splashImg, type ChampionAttributes } from "@loltr/content/lite";
 import { CDJ_MAX_MS, CDJ_MAX_TRIES, SPLASH_BLUR, SPLASH_SCALE, WARMUP_MS, type GameKey, type RoundState } from "@loltr/shared";
 
 // Manches d'exemple pour les tutoriels : le vrai jeu s'affiche avec un contenu de démonstration,
@@ -48,6 +48,17 @@ export function demoRound(game: GameKey): RoundState<any> {
       endsAt: now + WARMUP_MS + 30_000,
       warmUntil: now + WARMUP_MS,
       public: { target: "lux", tileCount: 25, round: 0, found: [], champions: 0, history: [], endsAt: now + WARMUP_MS + 30_000, warmUntil: now + WARMUP_MS, over: false, demoImages: tiles.map(spellImg) }
+    };
+  }
+
+  if (game === "mayhem") {
+    // Draft en cours : Faker au mid, l'équipe tirée est BLG 2024
+    const picks = { mid: { t: "t1-23", i: 2 } };
+    return {
+      ...base,
+      endsAt: null,
+      warmUntil: null,
+      public: { current: "blg-24", picks, jokers: 3, history: [{ t: "t1-23", what: "Faker" }], locked: false, group: false, tournament: null, me: 0, rating: mayhemRating(picks), over: false }
     };
   }
 

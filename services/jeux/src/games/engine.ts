@@ -12,6 +12,8 @@ export interface CreateCtx {
   now: number;
   /** Contenu déjà vu par le joueur (clés de contenu), à éviter. */
   seen: Set<string>;
+  /** Partie de groupe (classique) : le jeu peut attendre le reste du groupe. */
+  group?: boolean;
 }
 
 export interface ActOutcome<S> {

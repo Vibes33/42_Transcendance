@@ -1,7 +1,7 @@
 // Règles et valeurs du cahier des charges. Toute valeur marquée PROVISOIRE reste à trancher
 // (section 17 du cahier des charges) : on la change ici, à un seul endroit.
 
-export const GAME_KEYS = ["cdj", "meli", "se", "splash"] as const;
+export const GAME_KEYS = ["cdj", "meli", "se", "splash", "mayhem"] as const;
 export type GameKey = (typeof GAME_KEYS)[number];
 
 export type GameContext = "defi" | "classique" | "streamer";
@@ -24,7 +24,9 @@ export const GAMES: Record<GameKey, GameManifest> = {
   cdj: { key: "cdj", modes: ["solo", "groupe", "streamer"], minPlayers: 1, maxPlayers: 6, dailyEligible: true, alwaysInDaily: true, classicPlayable: false },
   meli: { key: "meli", modes: ["solo", "groupe", "streamer"], minPlayers: 1, maxPlayers: 6, dailyEligible: true, alwaysInDaily: false, classicPlayable: true },
   se: { key: "se", modes: ["solo", "groupe", "streamer"], minPlayers: 1, maxPlayers: 6, dailyEligible: true, alwaysInDaily: false, classicPlayable: true },
-  splash: { key: "splash", modes: ["solo", "groupe", "streamer"], minPlayers: 1, maxPlayers: 6, dailyEligible: true, alwaysInDaily: false, classicPlayable: true }
+  splash: { key: "splash", modes: ["solo", "groupe", "streamer"], minPlayers: 1, maxPlayers: 6, dailyEligible: true, alwaysInDaily: false, classicPlayable: true },
+  // World Mayhem : draft puis tournoi simulé, hors défi du jour (son classement est l'équipe du jour)
+  mayhem: { key: "mayhem", modes: ["solo", "groupe"], minPlayers: 1, maxPlayers: 6, dailyEligible: false, alwaysInDaily: false, classicPlayable: true }
 };
 
 /** Nombre de jeux du défi du jour : Champion du jour + 3 tirés au hasard. */
@@ -74,7 +76,7 @@ export const SE_BONUS_MS = 3_000;
 /** Défloutage avant le départ du chrono (Méli-MéLoL et Sorts éclair). */
 export const WARMUP_MS = 1_000;
 /** Splash mystère : dézoom en 6 crans, un par erreur. */
-export const SPLASH_SCALE = [5, 3.8, 2.9, 2.2, 1.7, 1.3, 1];
+export const SPLASH_SCALE = [3.2, 2.6, 2.1, 1.75, 1.45, 1.2, 1];
 export const SPLASH_BLUR = [14, 10, 7, 4.5, 2.5, 1, 0];
 /** Tolérance réseau sur les chronos validés par le serveur. */
 export const TIMER_GRACE_MS = 1_500;

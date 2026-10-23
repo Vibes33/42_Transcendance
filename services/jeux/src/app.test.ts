@@ -170,3 +170,62 @@ describe("mode classique", () => {
     expect((await post("/rounds", "g9", { game: "meli", context: "classique" }, "guest")).status).toBe(403);
   });
 });
+
+describe("World Mayhem", () => {
+  const draftAll = async (post: ReturnType<typeof setup>["post"], user: string, id: string) => {
+    let picks: Record<string, unknown> = {};
+    let st: any;
+    for (let k = 0; k < 5; k++) {
+      const free = ["top", "jgl", "mid", "adc", "sup"].findIndex((r) => !picks[r]);
+      st = (await post(`/rounds/${id}/act`, user, { type: "pick", index: free })).body.state;
+      picks = st.public.picks;
+    }
+    return st;
+  };
+
+  test("entre amis : le tournoi part quand tout le groupe a validé, le même pour tous", async () => {
+    const { post, call } = setup({ owned: { u1: ["game:mayhem"], u2: ["game:mayhem"] } });
+    const r1 = (await post("/rounds", "u1", { game: "mayhem", context: "classique", sessionId: "g1" })).body;
+    const r2 = (await post("/rounds", "u2", { game: "mayhem", context: "classique", sessionId: "g1" })).body;
+    expect(r1.public.group).toBe(true);
+    await draftAll(post, "u1", r1.id);
+    const locked = (await post(`/rounds/${r1.id}/act`, "u1", { type: "lock" })).body.state;
+    expect(locked.public.locked).toBe(true);
+    expect(locked.public.tournament).toBeNull();
+    // u2 n'a pas encore validé : pas de tournoi
+    expect((await call("/mayhem/group/g1", "u1")).body.tournament).toBeNull();
+    await draftAll(post, "u2", r2.id);
+    await post(`/rounds/${r2.id}/act`, "u2", { type: "lock" });
+    const g1 = (await call("/mayhem/group/g1", "u1")).body;
+    const g2 = (await call("/mayhem/group/g1", "u2")).body;
+    expect(g1.tournament.entrants.filter((e: any) => e.kind === "friend").length).toBe(2);
+    expect(g1.tournament.entrants.length).toBe(16);
+    expect(JSON.stringify(g1.tournament)).toBe(JSON.stringify(g2.tournament));
+    expect(g1.me).not.toBe(g2.me);
+    // Le tournoi est rangé dans la manche : « done » termine la partie avec les victoires
+    const done = (await post(`/rounds/${r1.id}/act`, "u1", { type: "done" })).body.state;
+    expect(done.over).toBe(true);
+  });
+
+  test("une page rechargée reprend le draft en cours", async () => {
+    const { post } = setup({ owned: { u1: ["game:mayhem"] } });
+    const a = (await post("/rounds", "u1", { game: "mayhem", context: "classique" })).body;
+    await post(`/rounds/${a.id}/act`, "u1", { type: "pick", index: 0 });
+    const b = (await post("/rounds", "u1", { game: "mayhem", context: "classique" })).body;
+    expect(b.id).toBe(a.id);
+    expect(b.public.picks.top).toBeTruthy();
+  });
+
+  test("équipe du jour : meilleur score (note + 2 par victoire)", async () => {
+    const { post, call } = setup({ owned: { u1: ["game:mayhem"] } });
+    const a = (await post("/rounds", "u1", { game: "mayhem", context: "classique" })).body;
+    await draftAll(post, "u1", a.id);
+    await post(`/rounds/${a.id}/act`, "u1", { type: "lock" });
+    const end = (await post(`/rounds/${a.id}/act`, "u1", { type: "done" })).body.state;
+    expect(end.over).toBe(true);
+    const day = (await call("/mayhem/day", "u1")).body;
+    expect(day.total).toBe(1);
+    expect(day.best.score).toBe(day.best.rating + 2 * day.best.wins);
+    expect(day.best.team.map((p: any) => p.role)).toEqual(["top", "jgl", "mid", "adc", "sup"]);
+  });
+});

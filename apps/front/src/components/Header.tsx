@@ -26,7 +26,7 @@ export function Header() {
   const inGameCtx = new URLSearchParams(loc.search).get("ctx");
   const on = {
     defi: path === "/" || path === "/recap" || (path === "/partie" && inGameCtx === "defi"),
-    jeux: path === "/jeux" || (path === "/partie" && inGameCtx === "classique"),
+    jeux: path === "/jeux" || path === "/mayhem" || (path === "/partie" && inGameCtx === "classique"),
     classement: path === "/classement",
     boutique: path === "/boutique",
     compte: path === "/profil" || path === "/historique" || path === "/parametres" || path === "/stream"

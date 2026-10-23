@@ -13,6 +13,9 @@ export interface RoundResult {
   champions?: number;
   /** Bonnes réponses (Sorts éclair). */
   correct?: number;
+  /** World Mayhem : note d'équipe et victoires en tournoi. */
+  rating?: number;
+  wins?: number;
   /** Durée de la manche, pour départager. */
   durationMs: number;
 }
@@ -28,6 +31,8 @@ export function basePoints(r: RoundResult): number {
       return (r.correct ?? 0) >= SUCCESS.se.atLeast ? BASE_POINTS : 0;
     case "splash":
       return (r.found ? SPLASH_CHAMPION_POINTS : 0) + (r.found && r.skinFound ? SPLASH_SKIN_POINTS : 0);
+    case "mayhem":
+      return 0;
   }
 }
 
@@ -41,6 +46,8 @@ export function hasPerformance(r: RoundResult): boolean {
       return (r.champions ?? 0) > 0;
     case "se":
       return (r.correct ?? 0) > 0;
+    case "mayhem":
+      return (r.rating ?? 0) > 0;
   }
 }
 
@@ -58,6 +65,8 @@ export function compareResults(a: RoundResult, b: RoundResult): number {
       return (b.champions ?? 0) - (a.champions ?? 0);
     case "se":
       return (b.correct ?? 0) - (a.correct ?? 0);
+    case "mayhem":
+      return (b.rating ?? 0) + 2 * (b.wins ?? 0) - ((a.rating ?? 0) + 2 * (a.wins ?? 0));
   }
 }
 

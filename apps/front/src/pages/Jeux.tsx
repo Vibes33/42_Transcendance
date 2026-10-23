@@ -101,7 +101,12 @@ export function Jeux() {
         {/* Hauteur fixe : les cartes du carrousel gardent la même taille quel que soit le jeu */}
         <div className="flex flex-col items-center gap-[1.4vh]">
           <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3.5 min-h-[clamp(48px,6vh,60px)]">
-            {playable && (
+            {gc.key === "mayhem" && (
+              <button type="button" onClick={() => nav("/mayhem")} className="h-[clamp(48px,6vh,60px)] px-[52px] border-0 bg-acc text-on-acc para cursor-pointer font-d font-bold text-lg tracking-[0.06em] uppercase">
+                {t("Ouvrir World Mayhem")}
+              </button>
+            )}
+            {playable && gc.key !== "mayhem" && (
               <>
                 {owned || !me.isUser ? (
                   <span className="tipw">
@@ -144,7 +149,7 @@ export function Jeux() {
             )}
           </div>
           <span className="min-h-[1lh] text-[13.5px] leading-normal text-mut">
-            {playable && !owned ? t("Gratuit en finissant le défi du jour (2 jeux si tu en réussis 3 sur 4), ou {n} éclats. En groupe, un membre qui l’a suffit.", { n: fmt(CLASSIC_UNLOCK_PRICE) }) : ""}
+            {playable && !owned && gc.key !== "mayhem" ? t("Gratuit en finissant le défi du jour (2 jeux si tu en réussis 3 sur 4), ou {n} éclats. En groupe, un membre qui l’a suffit.", { n: fmt(CLASSIC_UNLOCK_PRICE) }) : ""}
           </span>
         </div>
       </section>

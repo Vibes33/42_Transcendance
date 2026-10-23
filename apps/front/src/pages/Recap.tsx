@@ -22,7 +22,7 @@ function cellValue(s: LiveSession, m: LiveMember, i: number): number | null {
   if (!r?.done) return null;
   if (s.context === "defi") return r.projected;
   const x = r.summary;
-  return x?.champions ?? x?.correct ?? (x?.found ? 1 : 0);
+  return x?.champions ?? x?.correct ?? x?.wins ?? (x?.found ? 1 : 0);
 }
 
 export function Recap() {
