@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { CHIBIS, CHIBI_BY_KEY, RANDOM_ART, type Chibi } from "@loltr/content/lite";
 import type { Profile } from "@loltr/shared";
@@ -36,19 +36,140 @@ export function Profil() {
   const home = Math.max(0, roster.findIndex((c) => c.key === (me.random ? "lux" : me.profile?.chibi)));
   const [cIdx, setCIdx] = useState<number | null>(null);
   const [vitrine, setVitrine] = useState<string | null>(null);
+  // Carrousel fluide : la bande contient tous les chibis et défile en continu
+  // (scrollLeft animé en easeInOut), la sélection suit le mouvement, puis la vitrine
+  // s'ouvre à l'arrivée.
+  // (Déclaré avant les retours anticipés : les hooks ne peuvent pas être conditionnels.)
+  const stripRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef(new Map<string, HTMLButtonElement>());
+  const rosterRef = useRef(roster);
+  rosterRef.current = roster;
+  const raf = useRef<number | null>(null);
+  const gliding = useRef(false);
+  const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingKey = useRef<string | null>(null);
+  const cancelGlide = () => {
+    if (raf.current !== null) cancelAnimationFrame(raf.current);
+    raf.current = null;
+    gliding.current = false;
+    if (openTimer.current) clearTimeout(openTimer.current);
+    openTimer.current = null;
+    pendingKey.current = null;
+  };
+  useEffect(() => () => cancelGlide(), []);
+  const setCardRef = (key: string, el: HTMLButtonElement | null) => {
+    if (el) cardRefs.current.set(key, el);
+    else cardRefs.current.delete(key);
+  };
+  // Centre la carte `key` dans la bande, sans animation.
+  const centerKey = (key: string) => {
+    const strip = stripRef.current;
+    const el = cardRefs.current.get(key);
+    if (!strip || !el) return;
+    const s = strip.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    strip.scrollLeft += r.left - s.left - (strip.clientWidth - el.clientWidth) / 2;
+  };
+  const selKey = cIdx != null ? (roster[cIdx]?.key ?? null) : me.random ? "__random" : (roster[home]?.key ?? null);
+  // Recentre après un changement hors animation (montage, langue, équipement).
+  useEffect(() => {
+    if (!gliding.current && selKey) centerKey(selKey);
+  }, [selKey]);
+  const letterRefs = useRef(new Map<string, HTMLButtonElement>());
+  // La barre de lettres suit la sélection du carrousel (lettre courante centrée).
+  useEffect(() => {
+    const el = letterRefs.current.get(roster[cIdx ?? home]?.letter ?? "");
+    if (!el) return;
+    const reduced = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ inline: "center", block: "nearest", behavior: reduced ? "auto" : "smooth" });
+  }, [cIdx, home, roster]);
+  // Une lettre tapée n'importe où sur la page saute au champion correspondant
+  // (sauf en saisie ou vitrine ouverte, qui gardent leurs propres touches).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (!/^[a-zA-Z]$/.test(e.key)) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      if (vitrine) return;
+      e.preventDefault();
+      jump(e.key.toUpperCase());
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+  // Petite pause après l'arrivée du carrousel avant d'ouvrir la vitrine.
+  const scheduleVitrine = (key: string) => {
+    if (openTimer.current) clearTimeout(openTimer.current);
+    pendingKey.current = key;
+    openTimer.current = setTimeout(() => {
+      openTimer.current = null;
+      if (pendingKey.current === key) {
+        pendingKey.current = null;
+        setVitrine(key);
+      }
+    }, 200);
+  };
+  const glideTo = (i: number, open: boolean) => {
+    const list = rosterRef.current;
+    const clamp = (v: number) => Math.max(0, Math.min(list.length - 1, v));
+    const t = clamp(i);
+    const key = list[t].key;
+    const strip = stripRef.current;
+    const el = cardRefs.current.get(key);
+    const cur0 = cIdx ?? home;
+    const reduced = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!strip || !el || reduced || cur0 === t) {
+      cancelGlide();
+      setCIdx(t);
+      if (open) setVitrine(key);
+      else centerKey(key);
+      if (import.meta.env.DEV) {
+        // Diagnostic : indique pourquoi l'ouverture est instantanée au lieu de glisser.
+        console.debug("[carrousel] ouverture instantanée", { bande: !!strip, carte: !!el, mouvementReduit: reduced, depart: cur0, cible: t });
+      }
+      return;
+    }
+    cancelGlide();
+    const s = strip.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const from = strip.scrollLeft;
+    const to = from + (r.left - s.left) - (strip.clientWidth - el.clientWidth) / 2;
+    const dist = Math.abs(t - cur0);
+    const dur = Math.min(900, 220 + dist * 45);
+    const t0 = performance.now();
+    gliding.current = true;
+    let last = cur0;
+    const frame = (now: number) => {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+      strip.scrollLeft = from + (to - from) * e;
+      const v = clamp(Math.round(cur0 + (t - cur0) * e));
+      if (v !== last) {
+        last = v;
+        setCIdx(v);
+      }
+      if (p < 1) {
+        raf.current = requestAnimationFrame(frame);
+      } else {
+        raf.current = null;
+        gliding.current = false;
+        setCIdx(t);
+        if (open) scheduleVitrine(list[t].key);
+      }
+    };
+    raf.current = requestAnimationFrame(frame);
+  };
   if (!me.loading && !me.isUser) return <Navigate to="/" replace />;
   if (!me.profile) return null;
 
   const cur = cIdx ?? home;
-  const setC = (i: number) => setCIdx(Math.max(0, Math.min(roster.length - 1, i)));
   const jump = (L: string) => {
     const same = roster.map((c, i) => (c.letter === L ? i : -1)).filter((i) => i >= 0);
     if (!same.length) return;
     const after = same.find((i) => i > cur);
-    setC(roster[cur].letter === L && after !== undefined ? after : same[0]);
+    glideTo(roster[cur].letter === L && after !== undefined ? after : same[0], false);
   };
-  const startW = Math.max(0, Math.min(roster.length - 9, cur - 4));
-  const win = roster.slice(startW, startW + 9);
   const present = new Set(roster.map((c) => c.letter));
 
   const random = me.random;
@@ -62,6 +183,7 @@ export function Profil() {
   const chibisOwned = CHIBIS.filter((c) => owned.has("chibi:" + c.key)).length;
 
   const pickRandom = async () => {
+    cancelGlide();
     const p = await post<Profile>("/api/profil/equip", { chibi: "random" }).catch(() => null);
     if (p) queryClient.setQueryData(keys.profile, p);
   };
@@ -208,108 +330,108 @@ export function Profil() {
       </main>
 
       <section aria-label={t("Choix du chibi")} className="relative flex flex-col items-stretch gap-3.5 pt-3 pb-[26px] gutter">
-        <div
-          className="kb flex items-center gap-3 w-full box-border overflow-x-auto scroll"
-          tabIndex={0}
-          role="group"
-          aria-label={t("Carrousel des chibis. Tape une lettre pour aller au premier champion qui commence par elle, flèches pour naviguer, Entrée pour ouvrir la vitrine des skins.")}
-          onKeyDown={(e) => {
-            if (e.key === "ArrowRight") {
-              e.preventDefault();
-              setC(cur + 1);
-            } else if (e.key === "ArrowLeft") {
-              e.preventDefault();
-              setC(cur - 1);
-            } else if (e.key === "Enter") {
-              e.preventDefault();
-              setVitrine(roster[cur].key);
-            } else if (/^[a-zA-Z]$/.test(e.key)) {
-              e.preventDefault();
-              jump(e.key.toUpperCase());
-            }
-          }}
-        >
-          <button
-            type="button"
-            onClick={pickRandom}
-            aria-pressed={random}
-            aria-label={t("Chibi aléatoire")}
-            className="relative flex-1 min-w-[84px] p-0 border-0 cut-sm cursor-pointer"
-            style={{ height: random ? 156 : 134, background: random ? "var(--acc)" : "var(--line)" }}
-          >
-            <span className="absolute inset-[2px] flex flex-col items-center justify-between pt-3 bg-surf2 cut-sm">
-              <span className="w-11 h-11 box-border flex items-center justify-center rounded-full border-2 border-acc font-d font-bold text-[26px] text-acc">?</span>
-              <span className="w-full pt-1 pb-1.5 bg-surf text-xs font-bold text-ink text-center">{t("Aléatoire")}</span>
-            </span>
-          </button>
-          <ArrowBtn onClick={() => setC(cur - 1)} label={t("Chibi précédent")} size={48}>
+        <div className="flex items-center gap-3 w-full">
+          <ArrowBtn onClick={(e) => { glideTo(cur - 1, false); if (e.detail !== 0) stripRef.current?.focus({ preventScroll: true }); }} label={t("Chibi précédent")} size={48}>
             <TriLeft size={18} />
           </ArrowBtn>
-          {win.map((c) => {
-            const on = roster.indexOf(c) === cur;
-            const isEq = !random && c.key === me.profile?.chibi;
-            const unlocked = owned.has("chibi:" + c.key);
-            const extra = c.skins.length - 1;
-            return (
-              <button
-                key={c.key}
-                type="button"
-                onClick={() => {
-                  setC(roster.indexOf(c));
-                  setVitrine(c.key);
-                }}
-                aria-pressed={on}
-                aria-label={`${c.name}${unlocked ? "" : ", " + t("verrouillé")}${isEq ? ", " + t("équipé") : ""}, ${t("ouvrir la vitrine")}`}
-                className="relative flex-1 min-w-[84px] p-0 border-0 cut-sm cursor-pointer"
-                style={{ height: on ? 156 : 134, background: on ? "var(--acc)" : isEq ? "var(--ink)" : "var(--line)" }}
-              >
-                <span className="absolute inset-[2px] flex flex-col justify-end bg-surf2 cut-sm overflow-hidden">
-                  <img src={isEq && me.skin ? me.skin.art : c.skins[0].art} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: unlocked ? "none" : "grayscale(1) brightness(0.4)" }} />
-                  <span className="relative w-full pt-1 pb-1.5 bg-surf text-xs font-bold text-center" style={{ color: unlocked ? "var(--ink)" : "var(--mut)" }}>
-                    {c.name}
+          <div
+            ref={stripRef}
+            className="kb flex min-w-0 flex-1 items-center gap-3 box-border overflow-x-auto scroll"
+            tabIndex={0}
+            role="group"
+            aria-label={t("Carrousel des chibis. Tape une lettre pour aller au premier champion qui commence par elle, flèches pour naviguer, Entrée pour ouvrir la vitrine des skins.")}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowRight") {
+                e.preventDefault();
+                glideTo(cur + 1, false);
+              } else if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                glideTo(cur - 1, false);
+              } else if (e.key === "Enter") {
+                e.preventDefault();
+                cancelGlide();
+                setVitrine(roster[cur].key);
+              }
+            }}
+          >
+            <button
+              type="button"
+              ref={(el) => setCardRef("__random", el)}
+              onClick={pickRandom}
+              aria-pressed={random}
+              aria-label={t("Chibi aléatoire")}
+              className="relative w-[calc((100%_-_96px)/9)] min-w-[84px] shrink-0 p-0 border-0 cut-sm cursor-pointer transition-[height,background-color] duration-150"
+              style={{ height: random ? 156 : 134, background: random ? "var(--acc)" : "var(--line)" }}
+            >
+              <span className="absolute inset-[2px] flex flex-col items-center justify-between pt-3 bg-surf2 cut-sm">
+                <span className="w-11 h-11 box-border flex items-center justify-center rounded-full border-2 border-acc font-d font-bold text-[26px] text-acc">?</span>
+                <span className="w-full pt-1 pb-1.5 bg-surf text-xs font-bold text-ink text-center">{t("Aléatoire")}</span>
+              </span>
+            </button>
+            {roster.map((c, i) => {
+              const on = i === cur;
+              const isEq = !random && c.key === me.profile?.chibi;
+              const unlocked = owned.has("chibi:" + c.key);
+              const extra = c.skins.length - 1;
+              return (
+                <button
+                  key={c.key}
+                  type="button"
+                  ref={(el) => setCardRef(c.key, el)}
+                  onClick={() => glideTo(i, true)}
+                  aria-pressed={on}
+                  aria-label={`${c.name}${unlocked ? "" : ", " + t("verrouillé")}${isEq ? ", " + t("équipé") : ""}, ${t("ouvrir la vitrine")}`}
+                  className="relative w-[calc((100%_-_96px)/9)] min-w-[84px] shrink-0 p-0 border-0 cut-sm cursor-pointer transition-[height,background-color] duration-150"
+                  style={{ height: on ? 156 : 134, background: on ? "var(--acc)" : isEq ? "var(--ink)" : "var(--line)" }}
+                >
+                  <span className="absolute inset-[2px] flex flex-col justify-end bg-surf2 cut-sm overflow-hidden">
+                    <img src={isEq && me.skin ? me.skin.art : c.skins[0].art} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: unlocked ? "none" : "grayscale(1) brightness(0.4)" }} />
+                    <span className="relative w-full pt-1 pb-1.5 bg-surf text-xs font-bold text-center" style={{ color: unlocked ? "var(--ink)" : "var(--mut)" }}>
+                      {c.name}
+                    </span>
                   </span>
-                </span>
-                {!unlocked && (
-                  <span className="absolute top-2 right-2 text-white">
-                    <Lock />
-                  </span>
-                )}
-                <span className="absolute top-[7px] left-[7px] px-[5px] py-px bg-surf cut-sm font-d font-bold text-[10.5px] text-ink">{extra > 0 ? "+" + extra : "1"}</span>
-              </button>
-            );
-          })}
-          <ArrowBtn onClick={() => setC(cur + 1)} label={t("Chibi suivant")} size={48}>
+                  {!unlocked && (
+                    <span className="absolute top-2 right-2 text-white">
+                      <Lock />
+                    </span>
+                  )}
+                  <span className="absolute top-[7px] left-[7px] px-[5px] py-px bg-surf cut-sm font-d font-bold text-[10.5px] text-ink">{extra > 0 ? "+" + extra : "1"}</span>
+                </button>
+              );
+            })}
+          </div>
+          <ArrowBtn onClick={(e) => { glideTo(cur + 1, false); if (e.detail !== 0) stripRef.current?.focus({ preventScroll: true }); }} label={t("Chibi suivant")} size={48}>
             <TriRight size={18} />
           </ArrowBtn>
         </div>
-        <nav aria-label={t("Aller aux champions par lettre")} className="flex flex-nowrap items-center justify-between w-full overflow-x-auto scroll">
-          {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((L, i) => {
+        <nav aria-label={t("Aller aux champions par lettre")} className="flex flex-nowrap items-center justify-start w-fit max-w-full mx-auto gap-0.5 overflow-x-auto scroll">
+          {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((L) => {
             const ok = present.has(L);
             const isCur = roster[cur].letter === L;
             return (
-              <span key={L} className="inline-flex items-center shrink-0">
-                <button
-                  type="button"
-                  onClick={() => jump(L)}
-                  disabled={!ok}
-                  aria-current={isCur}
-                  aria-label={ok ? t("Aller aux champions en {l}", { l: L }) : t("Aucun champion en {l}", { l: L })}
-                  className="min-w-7 h-8 px-1 border-0 cut-sm font-d font-bold text-[15px]"
-                  style={{ background: isCur ? "var(--acc)" : "transparent", color: isCur ? "var(--on-acc)" : "var(--ink)", cursor: ok ? "pointer" : "default", opacity: ok ? 1 : 0.3 }}
-                >
-                  {L}
-                </button>
-                {i < 25 && (
-                  <span aria-hidden="true" className="px-0.5 text-xs text-mut opacity-60">
-                    ·
-                  </span>
-                )}
-              </span>
+              <button
+                key={L}
+                type="button"
+                ref={(el) => {
+                  if (el) letterRefs.current.set(L, el);
+                  else letterRefs.current.delete(L);
+                }}
+                onClick={(e) => {
+                  jump(L);
+                  if (e.detail !== 0) stripRef.current?.focus({ preventScroll: true });
+                }}
+                disabled={!ok}
+                aria-current={isCur}
+                aria-label={ok ? t("Aller aux champions en {l}", { l: L }) : t("Aucun champion en {l}", { l: L })}
+                className={`h-7 min-w-6 shrink-0 px-1 border-0 cut-sm font-d font-bold text-[13px] ${isCur ? "bg-acc text-on-acc" : ok ? "bg-transparent text-ink hover:bg-surf2" : "bg-transparent text-mut opacity-30 cursor-default"}`}
+              >
+                {L}
+              </button>
             );
           })}
         </nav>
       </section>
-      {vitrine && <Vitrine chibiKey={vitrine} owned={owned} onClose={() => setVitrine(null)} />}
+      {vitrine && <Vitrine chibiKey={vitrine} owned={owned} onClose={() => { setVitrine(null); stripRef.current?.focus({ preventScroll: true }); }} />}
     </div>
   );
 }
