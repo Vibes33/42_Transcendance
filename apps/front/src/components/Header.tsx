@@ -168,7 +168,12 @@ function AccountMenu({ active }: { active: boolean }) {
   };
 
   return (
-    <div className="relative" ref={ref}>
+    <div
+      className="relative"
+      ref={ref}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
       {me.isAnon ? (
         <button
           type="button"
@@ -207,7 +212,8 @@ function AccountMenu({ active }: { active: boolean }) {
         </button>
       )}
       {open && (
-        <div role="menu" aria-label={t("Menu du compte")} className="absolute top-[calc(100%+8px)] right-0 z-[41] w-[260px] p-[1.5px] bg-line cut-md" style={{ filter: "drop-shadow(0 16px 30px rgba(0,0,0,.35))" }}>
+        <div className="absolute top-full right-0 z-[41] w-[260px] pt-2 bg-transparent">
+          <div role="menu" aria-label={t("Menu du compte")} className="p-[1.5px] bg-line cut-md" style={{ filter: "drop-shadow(0 16px 30px rgba(0,0,0,.35))" }}>
           <div className="flex flex-col gap-0.5 p-2 bg-surf cut-md">
             {me.isUser && (
               <>
@@ -278,6 +284,7 @@ function AccountMenu({ active }: { active: boolean }) {
                 <MenuItem icon={<Logout />} label={t("Se déconnecter")} onClick={logout} />
               </>
             )}
+          </div>
           </div>
         </div>
       )}
