@@ -83,7 +83,13 @@ export function Vitrine({ chibiKey, owned, onClose }: { chibiKey: string; owned:
   };
 
   return (
-    <div className="fixed inset-0 z-[45] flex items-center justify-center p-4 sm:p-6 box-border" style={{ background: "color-mix(in srgb, var(--bg) 40%, transparent)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" }}>
+    <div
+      className="fixed inset-0 z-[45] flex items-center justify-center p-4 sm:p-6 box-border"
+      style={{ background: "color-mix(in srgb, var(--bg) 40%, transparent)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div
         ref={ref}
         className="kb p-[2px] bg-acc cut-lg max-h-full overflow-auto"
