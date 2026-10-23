@@ -64,6 +64,9 @@ bun run content:check            # champions missing hand-filled attributes
 
 Front with hot reload against the running stack: `bun run --cwd apps/front dev` (http://localhost:5173, API proxied to Traefik).
 
+Front with hot reload and zero rebuilds (no Bun needed on the host, page served on https://localhost:8443 as usual):
+`docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build` — every save under `apps/front/src` or `packages/*` reloads automatically.
+
 ## Legal
 
 LolTR isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.

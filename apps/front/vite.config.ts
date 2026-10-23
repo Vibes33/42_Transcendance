@@ -9,6 +9,9 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
+    // Sous Docker (docker-compose.dev.yml), les notifications de fichiers ne traversent pas
+    // toujours le partage Windows <-> conteneur : le polling garantit le hot reload.
+    watch: process.env.VITE_POLL_WATCH === "1" ? { usePolling: true, interval: 300 } : undefined,
     proxy: {
       "/api": { target: api, changeOrigin: true, secure: false },
       "/ws": { target: api.replace(/^http/, "ws"), ws: true, changeOrigin: true, secure: false }

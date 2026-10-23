@@ -1,0 +1,24 @@
+# Dev front avec hot reload, sans toucher à la prod.
+# Usage : docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+# Ensuite, chaque sauvegarde dans apps/front/src ou packages/* recharge https://localhost:8443
+# automatiquement : plus besoin de rebuild le service front. La prod (docker compose up
+# sans ce fichier) continue d'utiliser l'image buildée via apps/front/Dockerfile.
+name: loltr
+
+services:
+  front:
+    build:
+      context: .
+      dockerfile: apps/front/Dockerfile.dev
+    volumes:
+      - ./apps/front:/app/apps/front
+      - ./packages:/app/packages
+      - ./tsconfig.base.json:/app/tsconfig.base.json:ro
+      # node_modules installés à l'image, masqués par les montages ci-dessus sinon
+      - /app/apps/front/node_modules
+      - /app/packages/shared/node_modules
+      - /app/packages/content/node_modules
+    environment:
+      # Les événements inotify ne traversent pas toujours le partage de fichiers
+      # Windows <-> Docker : le polling garantit que Vite voit chaque sauvegarde.
+      VITE_POLL_WATCH: "1"
