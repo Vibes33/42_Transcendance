@@ -1,0 +1,2 @@
+# Force LF pour les scripts shell (Alpine/busybox plante sur CRLF Windows).
+*.sh text eol=lf
