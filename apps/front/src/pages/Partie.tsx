@@ -61,12 +61,19 @@ export function Partie() {
   }, [session?.index]);
   const myMember = session?.members.find((m) => m.userId === me.profile?.userId);
 
+  // Rejeu d'un tutoriel depuis les paramètres : démo sans vraie manche, puis retour aux paramètres.
+  const tutoForce = ctx === "classique" && !session && sp.get("tuto") === "1";
+
   // Tutoriel à la première partie en solo de chaque jeu (avant de lancer le chrono)
   const needsTuto = !!game && !session && !!me.profile && ctx !== "streamer" && !me.profile.tutorials?.[game];
 
   useEffect(() => {
     if (needsTuto && !round) setTutorial(game);
   }, [needsTuto, game, !!round]);
+
+  useEffect(() => {
+    if (tutoForce && game && !round && !tutorial) setTutorial(game);
+  }, [tutoForce, game, !!round, tutorial]);
 
   // Défi du jour terminé (ou pas commencé) : retour à l'accueil
   useEffect(() => {
@@ -75,7 +82,7 @@ export function Partie() {
 
   // Création ou reprise de la manche
   useEffect(() => {
-    if (round || !wanted || tutorial || !me.session || me.isAnon) return;
+    if (round || !wanted || tutorial || tutoForce || !me.session || me.isAnon) return;
     if (sessionId && !session) return;
     if (session && session.phase !== "playing") return;
     if (myMember && myMember.status === "away") return;
@@ -97,7 +104,7 @@ export function Partie() {
       // Impossible de jouer cette partie (défi déjà fait en solo…) : on libère le groupe
       if (session?.kind === "group") post(`/api/temps-reel/sessions/${session.id}/leave`).catch(() => {});
     });
-  }, [roundKey, !!round, tutorial, !!daily, me.session?.userId, session?.phase, myMember?.status]);
+  }, [roundKey, !!round, tutorial, tutoForce, !!daily, me.session?.userId, session?.phase, myMember?.status]);
 
   // Présence affichée aux amis pendant la partie
   useEffect(() => {
@@ -198,7 +205,7 @@ export function Partie() {
   // ses éléments. La vraie manche (et son chrono) n'est créée qu'ensuite.
   if (tutorial) {
     const Demo = GAME_UI[tutorial].component;
-    const demoFlow: GameFlow = { ctx, multi: false, rank, total: daily?.games.length ?? 4, nextLabel: "", onNext: () => {}, onQuit: quit, waiting: [], autoRecap: false, demo: true, side: null };
+    const demoFlow: GameFlow = { ctx, multi: false, rank, total: daily?.games.length ?? 4, nextLabel: "", onNext: () => {}, onQuit: tutoForce ? () => nav("/parametres") : quit, waiting: [], autoRecap: false, demo: true, side: null };
     return (
       <>
         <Demo round={demo ?? demoRound(tutorial)} act={async () => null} finish={async () => {}} flow={demoFlow} groupSize={1} namesLang={namesLang} />
@@ -206,7 +213,8 @@ export function Partie() {
           steps={GAME_UI[tutorial].tutorial}
           onDone={() => {
             markTutorial(tutorial);
-            setTutorial(null);
+            if (tutoForce) nav("/parametres");
+            else setTutorial(null);
           }}
         />
       </>

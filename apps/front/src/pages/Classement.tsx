@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useLeaderboard } from "../api/queries";
+import { Back } from "../components/icons";
 import { glow } from "../components/ui";
 import { fmt, plural, useT } from "../i18n";
 import { avatarOf } from "../lib/chibi";
@@ -15,6 +17,7 @@ type Scope = "mondial" | "copains";
 
 export function Classement() {
   const t = useT();
+  const nav = useNavigate();
   const me = useMe();
   const ui = useUi();
   const now = useNow(60_000);
@@ -31,6 +34,12 @@ export function Classement() {
 
   return (
     <div className="relative flex-auto flex flex-col" style={{ background: glow("900px 520px at 50% 470px", 22) }}>
+      <div className="absolute top-12 left-0 gutter">
+        <button type="button" onClick={() => nav(-1)} className="inline-flex items-center gap-2 min-h-11 text-mut font-semibold text-[15px] p-0 border-0 bg-transparent cursor-pointer">
+          <Back />
+          {t("Retour")}
+        </button>
+      </div>
       <section className="flex flex-col items-center gap-4 pt-12 gutter text-center">
         <h1 className="m-0 font-d font-bold leading-[1.02] tracking-[0.01em] uppercase" style={{ fontSize: "clamp(36px, 4.6vw, 64px)" }}>
           {t("Leaderboard")} <span className="text-acc">{scope === "copains" ? t("des copains") : t("mondial")}</span>

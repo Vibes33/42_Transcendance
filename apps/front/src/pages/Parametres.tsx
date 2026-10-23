@@ -3,7 +3,8 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import type { Profile, SiteLang } from "@loltr/shared";
 import { del, patch } from "../api/client";
 import { actions, keys, queryClient } from "../api/queries";
-import { markTutorial } from "../components/Tutorial";
+import { SITE_TOUR, Tutorial, markTutorial } from "../components/Tutorial";
+import { Back } from "../components/icons";
 import { Btn, Dialog, Pill, glow } from "../components/ui";
 import { useLang, useT } from "../i18n";
 import { refreshMe, toggleMode, useMe, useTheme } from "../state/app";
@@ -20,6 +21,7 @@ export function Parametres() {
   const { lang, setLang } = useLang();
   const mode = useTheme((s) => s.mode);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [playingSite, setPlayingSite] = useState(false);
   if (!me.loading && me.isAnon) return <Navigate to="/connexion" replace />;
   const p = me.profile;
   if (!p) return null;
@@ -32,11 +34,10 @@ export function Parametres() {
       useUi.getState().toast((e as Error).message, "danger");
     }
   };
-  const replay = async (key: string) => {
-    await markTutorial(key, false);
-    useUi.getState().toast(t("Le tutoriel sera rejoué à ta prochaine visite."), "ok");
-    if (key === "site") nav("/");
-  };
+  // Rejeu immédiat : la visite du site ici même, les jeux sur une manche d'exemple,
+  // puis retour aux paramètres quand le tutoriel est passé ou terminé.
+  const openSiteTour = () => setPlayingSite(true);
+  const openGameTour = (game: string) => nav(`/partie?ctx=classique&game=${game}&tuto=1`);
   const logout = async () => {
     await actions.logout().catch(() => {});
     disconnectLive();
@@ -52,7 +53,13 @@ export function Parametres() {
   };
 
   return (
-    <div className="flex-auto flex flex-col items-center gap-8 pt-12 pb-16 gutter" style={{ background: glow("900px 520px at 50% 300px", 16) }}>
+    <div className="relative flex-auto flex flex-col items-center gap-8 pt-12 pb-16 gutter" style={{ background: glow("900px 520px at 50% 300px", 16) }}>
+      <div className="absolute top-12 left-0 gutter">
+        <button type="button" onClick={() => nav(-1)} className="inline-flex items-center gap-2 min-h-11 text-mut font-semibold text-[15px] p-0 border-0 bg-transparent cursor-pointer">
+          <Back />
+          {t("Retour")}
+        </button>
+      </div>
       <h1 className="m-0 font-d font-bold leading-[1.02] uppercase text-center" style={{ fontSize: "clamp(34px, 4vw, 56px)" }}>
         {t("Mes")} <span className="text-acc">{t("paramètres")}</span>
       </h1>
@@ -89,7 +96,7 @@ export function Parametres() {
           )}
         </Section>
         <Section title={t("Tutoriels")}>
-          <p className="m-0 text-sm text-mut">{t("Revois la visite guidée du site ou le tutoriel d’un jeu : il se relancera à ta prochaine partie en solo.")}</p>
+          <p className="m-0 text-sm text-mut">{t("Revois la visite guidée du site ou le tutoriel d’un jeu : il se rejoue aussitôt, puis tu reviens ici.")}</p>
           <div className="flex flex-wrap gap-2">
             {[
               ["site", "Visite du site"],
@@ -98,7 +105,7 @@ export function Parametres() {
               ["se", "Sorts éclair"],
               ["splash", "Splash mystère"]
             ].map(([k, l]) => (
-              <button key={k} type="button" onClick={() => replay(k)} className="h-11 px-5 border-0 bg-surf2 text-ink cut-sm cursor-pointer font-bold text-[14.5px]">
+              <button key={k} type="button" onClick={() => (k === "site" ? openSiteTour() : openGameTour(k))} className="h-11 px-5 border-0 bg-surf2 text-ink cut-sm cursor-pointer font-bold text-[14.5px]">
                 {t(l)}
               </button>
             ))}
@@ -139,6 +146,7 @@ export function Parametres() {
           </div>
         </Section>
       </div>
+      {playingSite && <Tutorial steps={SITE_TOUR} onDone={() => { markTutorial("site"); setPlayingSite(false); }} />}
       {confirmDelete && (
         <Dialog labelledBy="titre-suppr" onClose={() => setConfirmDelete(false)}>
           <h2 id="titre-suppr" className="m-0 font-d font-bold text-[28px]">
