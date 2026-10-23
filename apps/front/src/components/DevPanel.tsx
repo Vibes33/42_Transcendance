@@ -6,7 +6,8 @@ import { fmt, useT } from "../i18n";
 import { useMe } from "../state/app";
 import { useUi } from "../state/ui";
 import { markTutorial } from "./Tutorial";
-import { Close, Gear } from "./icons";
+import { Close, Gear, TriLeft, TriRight } from "./icons";
+import { animLabel, groupAnimations, useModelStage } from "../lib/modelStage";
 
 // Panneau de test : seulement pour les comptes de test (connexion de développement, AUTH_DEV_LOGIN=true).
 // Les services refusent ces actions pour tout autre compte.
@@ -69,6 +70,8 @@ export function DevPanel() {
 
         <ModelSection />
 
+        <StageSection />
+
         <section className="flex flex-col gap-2">
           <span className="label">{t("Éclats")}</span>
           <div className="flex flex-wrap gap-1.5">
@@ -124,9 +127,149 @@ export function DevPanel() {
             <PanelBtn busy={busy} onClick={() => run(t("Tutoriels marqués comme vus."), () => Promise.all(TUTORIALS.map((k) => markTutorial(k, true))))}>{t("Passer tous les tutoriels")}</PanelBtn>
           </div>
         </section>
+
+        <section className="flex flex-col gap-2">
+          <span className="label">{t("Stockage local")}</span>
+          <p className="m-0 text-[13px] leading-relaxed text-mut">{t("Vide tout ce que le navigateur persiste (réglages 3D, thème, …) et recharge la page : utile si un vieux réglage coince l’affichage.")}</p>
+          <div className="flex flex-wrap gap-1.5">
+            <PanelBtn busy={busy} danger onClick={() => wipeBrowserStorage()}>
+              {t("Vider le stockage et recharger")}
+            </PanelBtn>
+          </div>
+        </section>
       </div>
     </aside>
   );
+}
+
+/** Rejoue une animation avec les bons accessoires, comme modelviewer.lol : les cases
+ * des parties suivent l'animation (liaison auto) sauf si on la coupe pour cocher à la main. */
+function StageSection() {
+  const t = useT();
+  const stage = useModelStage();
+  const cur = stage.entries.find((e) => e.id === stage.sel) ?? stage.entries[0];
+  if (!cur) {
+    return (
+      <section className="flex flex-col gap-2">
+        <span className="label !text-[11.5px] pt-1">{t("Animation et parties")}</span>
+        <span className="text-[13px] text-mut">{t("Aucun modèle 3D pilotable affiché.")}</span>
+      </section>
+    );
+  }
+  const groups = groupAnimations(cur.animations, cur.stem);
+  const curGid = cur.anim ?? groups.find((g) => g.parts.includes(cur.playing ?? ""))?.id;
+  const idx = groups.findIndex((g) => g.id === curGid);
+  const step = (d: number) => {
+    if (!groups.length) return;
+    stage.setAnim(cur.id, groups[idx < 0 ? (d > 0 ? 0 : groups.length - 1) : (idx + d + groups.length) % groups.length].id);
+  };
+  return (
+    <section className="flex flex-col gap-2">
+      <span className="label !text-[11.5px] pt-1">{t("Animation et parties")}</span>
+      {stage.entries.length > 1 && (
+        <select
+          value={cur.id}
+          onChange={(e) => stage.select(Number(e.target.value))}
+          aria-label={t("Modèle à animer")}
+          className="h-9 px-2 border border-line bg-surf2 text-ink cut-sm text-[13px] font-semibold"
+        >
+          {stage.entries.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.stem} · {e.placement}
+            </option>
+          ))}
+        </select>
+      )}
+      <div className="flex items-center gap-1.5">
+        <PanelBtn busy={false} onClick={() => step(-1)}>
+          <TriLeft size={14} />
+        </PanelBtn>
+        <select
+          value={cur.anim ?? ""}
+          onChange={(e) => stage.setAnim(cur.id, e.target.value || null)}
+          aria-label={t("Animation et parties")}
+          className="flex-auto min-w-0 h-10 px-2 border border-line bg-surf2 text-ink cut-sm text-[13px] font-semibold"
+        >
+          <option value="">
+            {t("Attente auto")}
+            {cur.playing ? ` (${animLabel(cur.playing)})` : ""}
+          </option>
+          {groups.map((g) => (
+            <option key={g.id} value={g.id} title={g.parts.join(" → ")}>
+              {g.label}
+              {g.parts.length > 1 ? ` (${g.parts.length})` : ""}
+            </option>
+          ))}
+        </select>
+        <PanelBtn busy={false} onClick={() => step(1)}>
+          <TriRight size={14} />
+        </PanelBtn>
+        <PanelBtn busy={false} onClick={() => stage.setPaused(cur.id, !cur.paused)}>
+          <span className="px-1">{cur.paused ? t("Lecture") : t("Pause")}</span>
+        </PanelBtn>
+      </div>
+      <label className="flex items-center gap-2 text-[13px] font-semibold cursor-pointer">
+        <input type="checkbox" checked={cur.auto} onChange={(e) => stage.setAuto(cur.id, e.target.checked)} style={{ accentColor: "var(--acc)", width: 16, height: 16 }} />
+        {t("Afficher/Masquer automatiquement")}
+      </label>
+      <label className="flex items-center gap-2 text-[13px] font-semibold cursor-pointer" title={t("À la fin d'une animation, revenir à l'attente")}>
+        <input type="checkbox" checked={cur.autoReturn} onChange={(e) => stage.setAutoReturn(cur.id, e.target.checked)} style={{ accentColor: "var(--acc)", width: 16, height: 16 }} />
+        {t("Retour auto à l’attente")}
+      </label>
+      <div className="flex flex-col gap-0.5 max-h-44 overflow-y-auto scroll pr-1">
+        {cur.parts.length === 0 && <span className="text-[12.5px] text-mut">{t("Aucune partie listée.")}</span>}
+        {cur.parts.map((p) => {
+          const on = cur.auto ? (cur.base[p.hash] ?? p.visible) : (cur.manual[p.hash] ?? cur.base[p.hash] ?? p.visible);
+          return (
+            <label
+              key={p.hash}
+              className="flex items-center gap-2 px-2 h-8 shrink-0 cut-sm text-[13px] font-semibold"
+              style={{ background: "var(--surf2)", opacity: cur.auto ? 0.75 : 1, cursor: cur.auto ? "default" : "pointer" }}
+            >
+              <input
+                type="checkbox"
+                checked={on}
+                disabled={cur.auto}
+                onChange={(e) => stage.setPart(cur.id, p.hash, e.target.checked)}
+                style={{ accentColor: "var(--acc)", width: 15, height: 15 }}
+              />
+              <span className="flex-auto truncate">{p.name}</span>
+            </label>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/** Vide tout ce que le navigateur persiste (localStorage, session, IndexedDB, caches, workers) puis recharge. */
+async function wipeBrowserStorage(): Promise<void> {
+  try {
+    localStorage.clear();
+  } catch {}
+  try {
+    sessionStorage.clear();
+  } catch {}
+  try {
+    const dbs = (await indexedDB.databases?.()) ?? [];
+    await Promise.all(
+      dbs.map(
+        (d) =>
+          d.name &&
+          new Promise<void>((res) => {
+            const req = indexedDB.deleteDatabase(d.name as string);
+            req.onsuccess = req.onerror = req.onblocked = () => res();
+          })
+      )
+    );
+  } catch {}
+  try {
+    for (const k of await caches.keys()) await caches.delete(k);
+  } catch {}
+  try {
+    for (const r of (await navigator.serviceWorker?.getRegistrations?.()) ?? []) await r.unregister();
+  } catch {}
+  location.reload();
 }
 
 function PanelBtn({ onClick, children, danger, busy }: { onClick: () => void; children: React.ReactNode; danger?: boolean; busy: boolean }) {

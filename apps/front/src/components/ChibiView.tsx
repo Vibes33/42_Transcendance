@@ -1,11 +1,14 @@
 import { createElement, useEffect, useRef, useState, type CSSProperties } from "react";
 import type { ModelPlacement } from "@loltr/content/lite";
 import { camera, effectiveTuning, modelStem, motion, useModelTuning } from "../lib/modelTuning";
+import { groupAnimations, useModelStage } from "../lib/modelStage";
 
 // Chibi en 3D (<model-viewer>) quand le skin a un modèle, sinon son image détourée. Le lecteur 3D
 // n'est chargé qu'au premier modèle affiché. Le modèle est rendu comme sur modelviewer.lol (parties visibles
 // image par image, ordre de rendu des visages) et cadré automatiquement : tous les chibis à la même échelle,
-// centrés, pieds en bas de la zone, tête qui dépasse du cadre placé derrière.
+// centrés, pieds en bas de la zone, tête qui dépasse du cadre placé derrière. Chaque animation lie
+// automatiquement ses parties (accessoires montrés/masqués) ; le panneau de test permet de rejouer une
+// animation avec les bons accessoires.
 // Réglages fins (taille, décalage, rotation, caméra) : MODEL_TUNING / MODEL_PLACEMENTS / MODEL_CAMERA dans
 // chibis.ts, ou en direct depuis le panneau de test.
 
@@ -45,6 +48,7 @@ interface Viewer extends HTMLElement {
   getBoundingBoxCenter(): { x: number; y: number; z: number };
   jumpCameraToGoal(): void;
   play(): void;
+  pause(): void;
 }
 
 /** L'animation d'attente du modèle : celle indiquée par le fichier, sinon Idle_Base, une autre « idle », la première. */
@@ -69,11 +73,57 @@ interface VisEvent {
   hideSubmeshList?: number[];
   showSubmeshList?: number[];
 }
-interface Prepared {
-  box: Box;
-  /** Applique les parties visibles à l'image donnée de l'animation. */
-  sync: (frame: number) => void;
+
+/** Modèle collecté une fois au chargement : parties, visibilités par défaut, événements par animation. */
+interface ModelMeshes {
+  all: any[];
+  byHash: Map<number, any[]>;
+  /** Parties listées par empreinte (nom du matériau, visibilité par défaut). */
+  parts: { hash: number; name: string; visible: boolean }[];
+  eventsOf: (anim: string) => VisEvent[];
 }
+
+/** Liaison d'une animation : événements appliqués, décors écartés, visibilité à l'image 0. */
+interface Binding {
+  events: VisEvent[];
+  banned: Set<any>;
+  base: Record<number, boolean>;
+  v: number;
+}
+
+/** Enchaînement en cours : clips restants, frontière de boucle, indices des fondus. */
+interface Chain {
+  gid: string;
+  parts: string[];
+  i: number;
+  stopIdx: number;
+  prevT: number;
+  stamp: number;
+  /** Index des clips atteints par fondu (changement de groupe). */
+  fades: number[];
+}
+
+/** Fondu enchaîné : l'opacité plonge, le clip bascule à mi-course, puis remonte. */
+interface Fade {
+  t0: number;
+  dur: number;
+  switched: boolean;
+  go: () => void;
+}
+
+interface Runtime {
+  model: ModelMeshes | null;
+  binding: Binding;
+  box: Box;
+  current: string | null;
+  chain: Chain | null;
+  fade: Fade | null;
+  /** Groupe demandé au dernier démarrage (évite de rejouer sur simple re-rendu). */
+  lastRequest: string | null;
+}
+
+const EMPTY_BINDING: Binding = { events: [], banned: new Set(), base: {}, v: 0 };
+let bindVer = 0;
 
 // Objets three.js internes au lecteur, non typés
 function sceneOf(mv: Viewer): any {
@@ -156,76 +206,143 @@ function partBox(me: any, inv: any): Box | null {
 }
 
 /**
- * Prépare le modèle chargé : rendu des matériaux, parties visibles et mesure.
- *
- * Visibilité : chaque partie a une visibilité par défaut (extras.visible du matériau) et l'animation jouée
- * en montre ou en cache d'autres à certaines images (extras.submeshVisibilityEvents du squelette, par
- * empreinte de partie) : clignements, expressions, accessoires (Tibbers n'apparaît que dans certaines
- * animations). En secours, les décors géants et les parties rangées sous le sol (l'ombre de Vex…) sont
- * toujours masqués.
- *
- * Mesure : sur les sommets dessinés après skinning, dans la pose de départ. Celle de model-viewer est fausse
- * pour ces modèles (squelette mis à l'échelle à part : elle sort parfois 100 fois trop grande). Les ombres
- * plates posées au sol ne comptent pas. Repli sur la mesure de model-viewer si la scène est inaccessible.
+ * Collecte du modèle chargé : rendu des matériaux, parties listées par empreinte,
+ * événements de visibilité par animation.
  */
-function prepare(mv: Viewer, anim: string | null): Prepared {
-  const fallback = { box: viewerBox(mv), sync: () => {} };
+function collectModel(mv: Viewer): ModelMeshes | null {
   const scene = sceneOf(mv);
-  if (!scene?.traverse) return fallback;
+  if (!scene?.traverse) return null;
   const all: any[] = [];
-  let events: VisEvent[] = [];
+  let eventsOf = (_anim: string): VisEvent[] => [];
   scene.traverse((o: any) => {
     if (o.isSkinnedMesh) all.push(o);
     const ev = o.userData?.submeshVisibilityEvents;
-    if (ev && anim && ev[anim]) events = ev[anim];
+    if (ev) eventsOf = (anim: string) => ev[anim] ?? [];
   });
-  if (!all.length) return fallback;
+  if (!all.length) return null;
   for (const me of all) setupMaterial(me);
   const byHash = new Map<number, any[]>();
+  const seen = new Map<number, { hash: number; name: string; visible: boolean }>();
   for (const me of all) {
     const h = me.material?.userData?.hash;
-    if (h !== undefined) byHash.set(h, [...(byHash.get(h) ?? []), me]);
+    if (h === undefined) continue;
+    byHash.set(h, [...(byHash.get(h) ?? []), me]);
+    if (!seen.has(h)) seen.set(h, { hash: h, name: String(me.material?.name || `Partie ${h}`), visible: me.material?.userData?.visible !== false });
   }
-  const banned = new Set<any>();
-  const sync = (frame: number) => {
-    const vis = new Map<any, boolean>(all.map((me) => [me, me.material?.userData?.visible !== false]));
-    for (const e of events) {
-      const from = e.startFrame ?? 0;
-      if (frame < from || (e.endFrame != null && frame > e.endFrame)) continue;
-      for (const h of e.hideSubmeshList ?? []) for (const me of byHash.get(h) ?? []) vis.set(me, false);
-      for (const h of e.showSubmeshList ?? []) for (const me of byHash.get(h) ?? []) vis.set(me, true);
-    }
-    for (const me of all) me.visible = !banned.has(me) && vis.get(me)!;
-  };
-  sync(0);
-  const start = new Set(all.filter((me) => me.visible));
-  // Parties montrées à un moment de l'animation : elles peuvent être des décors à écarter
-  const shown = new Set(events.flatMap((e) => e.showSubmeshList ?? []).flatMap((h) => byHash.get(h) ?? []));
-  scene.updateMatrixWorld(true);
-  // Repère du modèle (celui de camera-target) : le groupe glTF placé sous l'objet « Target » du lecteur
-  let root = all[0];
+  return { all, byHash, parts: [...seen.values()], eventsOf };
+}
+
+/** Visibilité de chaque partie à une image donnée (défauts + événements dans leur plage). */
+function frameVis(model: ModelMeshes, events: VisEvent[], frame: number): Map<any, boolean> {
+  const vis = new Map<any, boolean>(model.all.map((me) => [me, me.material?.userData?.visible !== false]));
+  for (const e of events) {
+    const from = e.startFrame ?? 0;
+    if (frame < from || (e.endFrame != null && frame > e.endFrame)) continue;
+    for (const h of e.hideSubmeshList ?? []) for (const me of model.byHash.get(h) ?? []) vis.set(me, false);
+    for (const h of e.showSubmeshList ?? []) for (const me of model.byHash.get(h) ?? []) vis.set(me, true);
+  }
+  return vis;
+}
+
+/** Repère du modèle (celui de camera-target) : le groupe glTF placé sous l'objet « Target » du lecteur. */
+function modelInv(mv: Viewer, model: ModelMeshes): any | null {
+  const scene = sceneOf(mv);
+  scene?.updateMatrixWorld?.(true);
+  let root = model.all[0];
   while (root.parent && root.parent.name !== "Target") root = root.parent;
-  const inv = new root.matrixWorld.constructor().copy(root.matrixWorld).invert();
+  return new root.matrixWorld.constructor().copy(root.matrixWorld).invert();
+}
+
+/**
+ * Liaison d'une animation : ses événements, ses décors écartés (ciel, sol, arène… et
+ * parties rangées sous le sol), et la visibilité de chaque partie à l'image 0.
+ * La mesure de cadrage, elle, n'est faite qu'une fois sur la pose d'attente.
+ */
+function bindModel(mv: Viewer, model: ModelMeshes, anim: string | null): Binding {
+  const events = (anim && model.eventsOf(anim)) || [];
+  const banned = new Set<any>();
+  const vis0 = frameVis(model, events, 0);
+  const start = new Set(model.all.filter((me) => vis0.get(me)));
+  // Parties montrées à un moment de l'animation : elles peuvent être des décors à écarter
+  const shown = new Set(events.flatMap((e) => e.showSubmeshList ?? []).flatMap((h) => model.byHash.get(h) ?? []));
+  const inv = modelInv(mv, model);
+  if (inv) {
+    for (const me of model.all) {
+      if (!start.has(me) && !shown.has(me)) continue;
+      const b = partBox(me, inv);
+      if (!b) continue;
+      const size = Math.max(b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z);
+      if (size > SCENERY || b.max.y < -0.02) {
+        banned.add(me);
+        me.visible = false;
+      }
+    }
+  }
+  const binding: Binding = { events, banned, base: {}, v: ++bindVer };
+  for (const [h, meshes] of model.byHash) binding.base[h] = meshes.every((me) => vis0.get(me));
+  syncModel(model, binding, 0, null);
+  return binding;
+}
+
+/**
+ * Applique les parties visibles à l'image donnée : liaison automatique (défauts +
+ * événements) ou états manuels des cases quand la liaison auto est coupée.
+ */
+function syncModel(model: ModelMeshes | null, binding: Binding, frame: number, manual: Record<number, boolean> | null): void {
+  if (!model) return;
+  let vis: Map<any, boolean>;
+  if (!manual) {
+    vis = frameVis(model, binding.events, frame);
+  } else {
+    vis = new Map();
+    for (const me of model.all) {
+      const h = me.material?.userData?.hash;
+      const def = me.material?.userData?.visible !== false;
+      vis.set(me, h === undefined ? def : (manual[h] ?? def));
+    }
+  }
+  for (const me of model.all) me.visible = !binding.banned.has(me) && (vis.get(me) ?? true);
+}
+
+/**
+ * Mesure du modèle sur les sommets dessinés après skinning, dans la pose de départ. Celle de
+ * model-viewer est fausse pour ces modèles (squelette mis à l'échelle à part : elle sort parfois
+ * 100 fois trop grande). Les ombres plates posées au sol ne comptent pas.
+ */
+function measureModel(mv: Viewer, model: ModelMeshes, binding: Binding): Box | null {
+  const vis0 = frameVis(model, binding.events, 0);
+  const start = new Set(model.all.filter((me) => vis0.get(me)));
+  const shown = new Set(binding.events.flatMap((e) => e.showSubmeshList ?? []).flatMap((h) => model.byHash.get(h) ?? []));
+  const inv = modelInv(mv, model);
+  if (!inv) return null;
   const min = { x: Infinity, y: Infinity, z: Infinity };
   const max = { x: -Infinity, y: -Infinity, z: -Infinity };
-  for (const me of all) {
+  for (const me of model.all) {
     if (!start.has(me) && !shown.has(me)) continue;
     const b = partBox(me, inv);
     if (!b) continue;
-    const size = Math.max(b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z);
-    if (size > SCENERY || b.max.y < -0.02) {
-      banned.add(me);
-      me.visible = false;
-      continue;
-    }
     if (!start.has(me) || (b.max.y - b.min.y < 0.05 && Math.abs(b.min.y) < 0.05)) continue;
     for (const a of ["x", "y", "z"] as const) {
       min[a] = Math.min(min[a], b.min[a]);
       max[a] = Math.max(max[a], b.max[a]);
     }
   }
-  if (!(max.y > min.y)) return { ...fallback, sync };
-  return { box: { min, max }, sync };
+  return max.y > min.y ? { min, max } : null;
+}
+
+/** Joue un clip avec sa liaison parties (bons accessoires), en suivant la sélection du panneau. */
+function playClip(mv: Viewer, r: Runtime, sid: number | null, clip: string): void {
+  if (r.model) {
+    r.binding = bindModel(mv, r.model, clip);
+    if (sid != null) {
+      const st = useModelStage.getState();
+      st.setBase(sid, r.binding.base);
+      st.setPlaying(sid, clip);
+    }
+  }
+  mv.animationName = clip;
+  mv.play();
+  r.current = clip;
 }
 
 /**
@@ -281,6 +398,11 @@ export function ChibiView({
 }) {
   const [ready3d, setReady3d] = useState(false);
   const ref = useRef<Viewer | null>(null);
+  // Pilotage depuis le panneau de test (animation + parties) ; sans pilotage, attente auto.
+  const [stageId, setStageId] = useState<number | null>(null);
+  const stageIdRef = useRef<number | null>(null);
+  const entry = useModelStage((s) => (stageId == null ? null : (s.entries.find((e) => e.id === stageId) ?? null)));
+  const rt = useRef<Runtime | null>(null);
 
   useEffect(() => {
     if (!model3d) return;
@@ -302,41 +424,117 @@ export function ChibiView({
     let theta = 0;
     let side = 1;
     const stem = modelStem(model3d);
-    // Mesuré une fois au chargement : recadrer à chaque image ferait suivre l'animation à la caméra
-    let prep: Prepared | null = null;
-    const apply = (jump: boolean) => mv.loaded && prep && frame(mv, prep.box, stem, placement, theta, jump);
+    const stage = useModelStage.getState();
+    const apply = (jump: boolean) => {
+      const r = rt.current;
+      if (mv.loaded && r) frame(mv, r.box, stem, placement, theta, jump);
+    };
     let loads = 0;
     const onLoad = () => {
-      prep = null;
+      rt.current = null;
       const id = ++loads;
       mv.style.opacity = "0";
       let initial: string | undefined;
       sceneOf(mv)?.traverse?.((o: any) => (initial ??= o.userData?.initialAnimation));
-      const idle = pickIdle(mv.availableAnimations ?? [], initial);
-      if (idle) {
-        mv.animationName = idle;
-        mv.play();
+      const names = mv.availableAnimations ?? [];
+      const groups = groupAnimations(names, stem);
+      const idleG = groups.find((x) => x.id === "idle");
+      // À l'ouverture : la boucle d'attente, comme avant (pas l'intro)
+      const startName = (idleG ? (idleG.parts[idleG.loopIndex] ?? idleG.parts[0] ?? null) : null) ?? pickIdle(names, initial);
+      const model = collectModel(mv);
+      // Enregistre le modèle pour le panneau de test (animations + parties pilotables)
+      let sid = stageIdRef.current;
+      if (model) {
+        if (sid == null) {
+          sid = stage.register({ stem, placement, animations: names, parts: model.parts });
+          stageIdRef.current = sid;
+          setStageId(sid);
+        } else {
+          stage.update(sid, { animations: names, parts: model.parts });
+        }
       }
+      let binding = EMPTY_BINDING;
+      let box = viewerBox(mv);
+      if (model && startName) {
+        // Mesure sur la pose d'attente
+        binding = bindModel(mv, model, startName);
+        box = measureModel(mv, model, binding) ?? viewerBox(mv);
+        if (sid != null) stage.setBase(sid, binding.base);
+      }
+      if (startName) {
+        mv.animationName = startName;
+        mv.play();
+        if (sid != null) stage.setPlaying(sid, startName);
+      }
+      rt.current = { model, binding, box, current: startName ?? null, chain: null, fade: null, lastRequest: null };
       // Mesure après deux images, une fois la pose d'attente appliquée (certaines parties y sont repliées)
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
           // Un autre modèle a été demandé entre-temps : sa propre mesure suivra
           if (id !== loads || !mv.loaded) return;
-          prep = prepare(mv, idle);
           apply(true);
           mv.style.opacity = "1";
         })
       );
     };
-    // Parties visibles image par image (clignements, expressions) ; l'animation boucle
+    // Parties visibles image par image (clignements, expressions, accessoires) ; l'animation boucle
     let raf = 0;
     let last = -1;
+    let lastSig = "";
     const tick = () => {
       raf = requestAnimationFrame(tick);
-      if (!prep) return;
+      const r = rt.current;
+      if (!r?.model) return;
+      const st = useModelStage.getState();
+      const en = stageIdRef.current == null ? null : st.entries.find((e) => e.id === stageIdRef.current);
+      const manual = en && !en.auto ? en.manual : null;
+      const sig = `${r.binding.v}|${manual ? JSON.stringify(manual) : ""}`;
       const d = mv.duration;
       const f = Math.floor((d > 0 ? mv.currentTime % d : mv.currentTime) * FPS);
-      if (f !== last) prep.sync((last = f));
+      if (f !== last || sig !== lastSig) syncModel(r.model, r.binding, f, manual), (last = f), (lastSig = sig);
+      const paused = !!(en && en.paused);
+      // Fondu enchaîné : l'opacité plonge, le clip bascule à mi-course, puis remonte
+      const fd = r.fade;
+      if (fd && !paused) {
+        const p = Math.min(1, (performance.now() - fd.t0) / fd.dur);
+        mv.style.transition = "none";
+        mv.style.opacity = String(p < 0.5 ? 1 - p * 2 : (p - 0.5) * 2);
+        if (p >= 0.5 && !fd.switched) {
+          fd.switched = true;
+          fd.go();
+        }
+        if (p >= 1) {
+          mv.style.opacity = "1";
+          mv.style.transition = "opacity .25s ease";
+          r.fade = null;
+        }
+      }
+      // Enchaînement auto : à la fin d'un clip, passage au suivant (jamais de coupe en pleine pose)
+      const c = r.chain;
+      if (!r.fade && c && !paused) {
+        const t = mv.currentTime || 0;
+        if (d > 0.1 && performance.now() - c.stamp > 200 && c.i < c.stopIdx && (t >= d - 1 / 30 || t < c.prevT - 0.05)) {
+          const ni = c.i + 1;
+          if (c.fades.includes(ni)) {
+            r.fade = {
+              t0: performance.now(),
+              dur: 180,
+              switched: false,
+              go: () => {
+                const rr = rt.current;
+                if (!rr || !rr.chain) return;
+                playClip(mv, rr, stageIdRef.current, rr.chain.parts[ni]);
+                rr.chain = ni >= rr.chain.stopIdx ? null : { ...rr.chain, i: ni, prevT: 0, stamp: performance.now() };
+              }
+            };
+          } else {
+            playClip(mv, r, stageIdRef.current, c.parts[ni]);
+            r.chain = ni >= c.stopIdx ? null : { ...c, i: ni, prevT: 0, stamp: performance.now() };
+          }
+        } else {
+          c.prevT = t;
+        }
+      }
     };
     raf = requestAnimationFrame(tick);
     mv.addEventListener("load", onLoad);
@@ -357,8 +555,62 @@ export function ChibiView({
       clearInterval(sway);
       ro.disconnect();
       unsub();
+      rt.current = null;
+      if (stageIdRef.current != null) {
+        useModelStage.getState().unregister(stageIdRef.current);
+        stageIdRef.current = null;
+        setStageId(null);
+      }
     };
   }, [model3d, ready3d, placement]);
+
+  // Groupe choisi depuis le panneau de test : enchaîne ses clips puis transitionne
+  // (retour à l'attente ou boucle du dernier clip) avec fondu entre les groupes ;
+  // ne rejoue jamais l'intro tout seul.
+  useEffect(() => {
+    const mv = ref.current;
+    const r = rt.current;
+    if (!mv || !r) return;
+    const st = useModelStage.getState();
+    const en = stageIdRef.current == null ? null : st.entries.find((e) => e.id === stageIdRef.current);
+    const groups = groupAnimations(mv.availableAnimations ?? [], modelStem(model3d ?? ""));
+    const idleG = groups.find((x) => x.id === "idle");
+    const idleLoop = idleG ? (idleG.parts[idleG.loopIndex] ?? idleG.parts[0] ?? null) : null;
+    const g = en?.anim ? (groups.find((x) => x.id === en.anim) ?? idleG) : idleG;
+    const req = en?.anim ?? null;
+    if (g && req !== r.lastRequest) {
+      r.lastRequest = req;
+      const continuingIdle = req == null && idleG != null && g.id === idleG.id && r.current != null && idleG.parts.includes(r.current);
+      if (!continuingIdle && !(r.chain && r.chain.gid === g.id)) {
+        const want = g.id === idleG?.id ? g.parts : [...g.parts, ...(en?.autoReturn === false || !idleLoop ? [] : [idleLoop])];
+        const first = want[0];
+        if (first && first !== r.current) {
+          // Changement de groupe : fondu vers le premier clip (sauf au tout premier affichage)
+          const partGroup = new Map<string, string>();
+          for (const gg of groups) for (const p of gg.parts) partGroup.set(p, gg.id);
+          const fades: number[] = [];
+          want.forEach((p, idx) => {
+            if (idx > 0 && partGroup.get(p) !== partGroup.get(want[idx - 1])) fades.push(idx);
+          });
+          const sid = stageIdRef.current;
+          const startChain = () => {
+            const rr = rt.current;
+            if (!rr) return;
+            playClip(mv, rr, sid, first);
+            rr.chain = want.length > 1 && rr.model ? { gid: g.id, parts: want, i: 0, stopIdx: want.length - 1, prevT: 0, stamp: performance.now(), fades } : null;
+          };
+          if (r.current != null) {
+            r.fade = { t0: performance.now(), dur: 180, switched: false, go: startChain };
+          } else {
+            startChain();
+          }
+        }
+      }
+    }
+    if (!mv.loaded) return;
+    if (en?.paused) mv.pause();
+    else if (r.current) mv.play();
+  }, [entry?.anim, entry?.paused, model3d, ready3d, placement]);
 
   const float = useModelTuning((s) => s.motion.float) ?? motion().float;
   const cam = camera();
