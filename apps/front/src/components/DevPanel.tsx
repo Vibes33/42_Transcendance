@@ -1,43 +1,30 @@
 import { useState } from "react";
-import { camera, exportCode, modelTuning, motion, placementTuning, useModelTuning } from "../lib/modelTuning";
-import { post } from "../api/client";
-import { keys, useInvalidate, useSession } from "../api/queries";
 import { fmt, useT } from "../i18n";
+import { useSession } from "../api/queries";
 import { useMe } from "../state/app";
-import { useUi } from "../state/ui";
-import { markTutorial } from "./Tutorial";
-import { Close, Gear, TriLeft, TriRight } from "./icons";
-import { animLabel, groupAnimations, useModelStage } from "../lib/modelStage";
+import { Close, Gear } from "./icons";
+import { CollectionSection, DailySection, ShardsSection, StorageSection, TutorialsSection } from "./dev/accountSections";
+import { ModelSection } from "./dev/ModelSection";
+import { StageSection } from "./dev/StageSection";
+import { useDevRun } from "./dev/useDevRun";
 
 // Panneau de test : seulement pour les comptes de test (connexion de développement, AUTH_DEV_LOGIN=true).
 // Les services refusent ces actions pour tout autre compte.
 
-const TUTORIALS = ["site", "cdj", "meli", "se", "splash"];
+type TabId = "compte" | "3d" | "anims" | "systeme";
 
 export function DevPanel() {
-  const t = useT();
   const session = useSession();
-  const me = useMe();
-  const invalidate = useInvalidate();
-  const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState("1000");
-  const [streak, setStreak] = useState("7");
-  const [busy, setBusy] = useState(false);
   if (!session.data?.testAccount) return null;
+  return <DevPanelInner />;
+}
 
-  const run = async (label: string, fn: () => Promise<unknown>) => {
-    setBusy(true);
-    try {
-      await fn();
-      await invalidate(keys.me, keys.shop, keys.inventory, keys.daily, keys.profile, keys.stats);
-      useUi.getState().toast(label, "ok");
-    } catch (e) {
-      useUi.getState().toast((e as Error).message, "danger");
-    } finally {
-      setBusy(false);
-    }
-  };
-  const shards = (n: number) => run(n >= 0 ? t("+{n} éclats", { n: fmt(n) }) : t("{n} éclats", { n: fmt(n) }), () => post("/api/classement/dev/shards", { amount: n }));
+function DevPanelInner() {
+  const t = useT();
+  const me = useMe();
+  const { busy, run } = useDevRun();
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<TabId>("compte");
 
   if (!open)
     return (
@@ -53,8 +40,15 @@ export function DevPanel() {
       </button>
     );
 
+  const tabs: { id: TabId; label: string }[] = [
+    { id: "compte", label: t("Compte") },
+    { id: "3d", label: t("3D") },
+    { id: "anims", label: t("Anims") },
+    { id: "systeme", label: t("Système") },
+  ];
+
   return (
-    <aside role="dialog" aria-labelledby="titre-test" className="fixed left-4 bottom-4 z-[70] w-[min(calc(100vw-32px),400px)] max-h-[calc(100vh-32px)] overflow-y-auto p-[1.5px] cut-md" style={{ background: "var(--warn)", boxShadow: "0 18px 50px rgba(0,0,0,.45)" }}>
+    <aside role="dialog" aria-labelledby="titre-test" className="fixed left-4 bottom-4 z-[70] w-[min(calc(100vw-32px),720px)] max-h-[calc(100vh-32px)] overflow-y-auto p-[1.5px] cut-md" style={{ background: "var(--warn)", boxShadow: "0 18px 50px rgba(0,0,0,.45)" }}>
       <div className="flex flex-col gap-4 p-5 bg-surf cut-md">
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-0.5">
@@ -63,338 +57,44 @@ export function DevPanel() {
             </h2>
             <span className="text-[12.5px] text-mut">{t("Compte de test uniquement. Solde : {n} éclats", { n: fmt(me.balance) })}</span>
           </div>
-          <button type="button" onClick={() => setOpen(false)} aria-label={t("Fermer le panneau de test")} className="w-9 h-9 flex items-center justify-center border-0 bg-surf2 text-ink cut-sm cursor-pointer">
+          <button type="button" onClick={() => setOpen(false)} aria-label={t("Fermer le panneau de test")} className="w-9 h-9 shrink-0 flex items-center justify-center border-0 bg-surf2 text-ink cut-sm cursor-pointer">
             <Close size={16} />
           </button>
         </div>
 
-        <ModelSection />
+        <div role="tablist" aria-label={t("Panneau de test")} className="flex gap-1 p-1 bg-surf2 cut-sm">
+          {tabs.map((tb) => {
+            const active = tab === tb.id;
+            return (
+              <button
+                key={tb.id}
+                role="tab"
+                aria-selected={active}
+                type="button"
+                onClick={() => setTab(tb.id)}
+                className="flex-auto h-9 px-2 border-0 cut-sm cursor-pointer text-[13px] font-bold uppercase tracking-[0.05em]"
+                style={{ background: active ? "var(--acc)" : "transparent", color: active ? "var(--on-acc)" : "var(--mut)" }}
+              >
+                {tb.label}
+              </button>
+            );
+          })}
+        </div>
 
-        <StageSection />
-
-        <section className="flex flex-col gap-2">
-          <span className="label">{t("Éclats")}</span>
-          <div className="flex flex-wrap gap-1.5">
-            {[100, 500, 1000, 5000].map((n) => (
-              <PanelBtn busy={busy} key={n} onClick={() => shards(n)}>
-                +{fmt(n)}
-              </PanelBtn>
-            ))}
-            <PanelBtn busy={busy} danger onClick={() => shards(-me.balance)}>
-              {t("Mettre à 0")}
-            </PanelBtn>
-          </div>
-          <div className="flex gap-1.5">
-            <NumField value={amount} onChange={setAmount} label={t("Montant d’éclats")} />
-            <PanelBtn busy={busy} onClick={() => shards(Math.trunc(Number(amount) || 0))}>{t("Ajouter / retirer")}</PanelBtn>
-          </div>
-        </section>
-
-        <section className="flex flex-col gap-2">
-          <span className="label">{t("Collection")}</span>
-          <div className="flex flex-wrap gap-1.5">
-            <PanelBtn busy={busy} onClick={() => run(t("Tout est débloqué."), () => post("/api/classement/dev/unlock-all"))}>{t("Tout débloquer")}</PanelBtn>
-            <PanelBtn busy={busy} danger onClick={() => run(t("Inventaire vidé (premier chibi conservé)."), () => post("/api/classement/dev/reset-inventory"))}>
-              {t("Vider l’inventaire")}
-            </PanelBtn>
-          </div>
-        </section>
-
-        <section className="flex flex-col gap-2">
-          <span className="label">{t("Défi du jour et série")}</span>
-          <div className="flex flex-wrap gap-1.5">
-            <PanelBtn busy={busy}
-              onClick={() =>
-                run(t("Défi du jour réinitialisé."), async () => {
-                  await post("/api/jeux/dev/reset-day");
-                  await post("/api/classement/dev/reset-day");
-                })
-              }
-            >
-              {t("Rejouer le défi du jour")}
-            </PanelBtn>
-          </div>
-          <div className="flex gap-1.5">
-            <NumField value={streak} onChange={setStreak} label={t("Jours de série")} />
-            <PanelBtn busy={busy} onClick={() => run(t("Série modifiée."), () => post("/api/classement/dev/streak", { days: Math.max(0, Math.trunc(Number(streak) || 0)) }))}>{t("Définir la série")}</PanelBtn>
-          </div>
-        </section>
-
-        <section className="flex flex-col gap-2">
-          <span className="label">{t("Tutoriels")}</span>
-          <div className="flex flex-wrap gap-1.5">
-            <PanelBtn busy={busy} onClick={() => run(t("Les tutoriels seront rejoués."), () => Promise.all(TUTORIALS.map((k) => markTutorial(k, false))))}>{t("Revoir tous les tutoriels")}</PanelBtn>
-            <PanelBtn busy={busy} onClick={() => run(t("Tutoriels marqués comme vus."), () => Promise.all(TUTORIALS.map((k) => markTutorial(k, true))))}>{t("Passer tous les tutoriels")}</PanelBtn>
-          </div>
-        </section>
-
-        <section className="flex flex-col gap-2">
-          <span className="label">{t("Stockage local")}</span>
-          <p className="m-0 text-[13px] leading-relaxed text-mut">{t("Vide tout ce que le navigateur persiste (réglages 3D, thème, …) et recharge la page : utile si un vieux réglage coince l’affichage.")}</p>
-          <div className="flex flex-wrap gap-1.5">
-            <PanelBtn busy={busy} danger onClick={() => wipeBrowserStorage()}>
-              {t("Vider le stockage et recharger")}
-            </PanelBtn>
-          </div>
-        </section>
+        <div className="flex flex-col gap-4">
+          {tab === "compte" && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ShardsSection busy={busy} run={run} />
+              <CollectionSection busy={busy} run={run} />
+              <DailySection busy={busy} run={run} />
+              <TutorialsSection busy={busy} run={run} />
+            </div>
+          )}
+          {tab === "3d" && <ModelSection />}
+          {tab === "anims" && <StageSection />}
+          {tab === "systeme" && <StorageSection busy={busy} />}
+        </div>
       </div>
     </aside>
-  );
-}
-
-/** Rejoue une animation avec les bons accessoires, comme modelviewer.lol : les cases
- * des parties suivent l'animation (liaison auto) sauf si on la coupe pour cocher à la main. */
-function StageSection() {
-  const t = useT();
-  const stage = useModelStage();
-  const cur = stage.entries.find((e) => e.id === stage.sel) ?? stage.entries[0];
-  if (!cur) {
-    return (
-      <section className="flex flex-col gap-2">
-        <span className="label !text-[11.5px] pt-1">{t("Animation et parties")}</span>
-        <span className="text-[13px] text-mut">{t("Aucun modèle 3D pilotable affiché.")}</span>
-      </section>
-    );
-  }
-  const groups = groupAnimations(cur.animations, cur.stem);
-  const curGid = cur.anim ?? groups.find((g) => g.parts.includes(cur.playing ?? ""))?.id;
-  const idx = groups.findIndex((g) => g.id === curGid);
-  const step = (d: number) => {
-    if (!groups.length) return;
-    stage.setAnim(cur.id, groups[idx < 0 ? (d > 0 ? 0 : groups.length - 1) : (idx + d + groups.length) % groups.length].id);
-  };
-  return (
-    <section className="flex flex-col gap-2">
-      <span className="label !text-[11.5px] pt-1">{t("Animation et parties")}</span>
-      {stage.entries.length > 1 && (
-        <select
-          value={cur.id}
-          onChange={(e) => stage.select(Number(e.target.value))}
-          aria-label={t("Modèle à animer")}
-          className="h-9 px-2 border border-line bg-surf2 text-ink cut-sm text-[13px] font-semibold"
-        >
-          {stage.entries.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.stem} · {e.placement}
-            </option>
-          ))}
-        </select>
-      )}
-      <div className="flex items-center gap-1.5">
-        <PanelBtn busy={false} onClick={() => step(-1)}>
-          <TriLeft size={14} />
-        </PanelBtn>
-        <select
-          value={cur.anim ?? ""}
-          onChange={(e) => stage.setAnim(cur.id, e.target.value || null)}
-          aria-label={t("Animation et parties")}
-          className="flex-auto min-w-0 h-10 px-2 border border-line bg-surf2 text-ink cut-sm text-[13px] font-semibold"
-        >
-          <option value="">
-            {t("Attente auto")}
-            {cur.playing ? ` (${animLabel(cur.playing)})` : ""}
-          </option>
-          {groups.map((g) => (
-            <option key={g.id} value={g.id} title={g.parts.join(" → ")}>
-              {g.label}
-              {g.parts.length > 1 ? ` (${g.parts.length})` : ""}
-            </option>
-          ))}
-        </select>
-        <PanelBtn busy={false} onClick={() => step(1)}>
-          <TriRight size={14} />
-        </PanelBtn>
-        <PanelBtn busy={false} onClick={() => stage.setPaused(cur.id, !cur.paused)}>
-          <span className="px-1">{cur.paused ? t("Lecture") : t("Pause")}</span>
-        </PanelBtn>
-      </div>
-      <label className="flex items-center gap-2 text-[13px] font-semibold cursor-pointer">
-        <input type="checkbox" checked={cur.auto} onChange={(e) => stage.setAuto(cur.id, e.target.checked)} style={{ accentColor: "var(--acc)", width: 16, height: 16 }} />
-        {t("Afficher/Masquer automatiquement")}
-      </label>
-      <label className="flex items-center gap-2 text-[13px] font-semibold cursor-pointer" title={t("À la fin d'une animation, revenir à l'attente")}>
-        <input type="checkbox" checked={cur.autoReturn} onChange={(e) => stage.setAutoReturn(cur.id, e.target.checked)} style={{ accentColor: "var(--acc)", width: 16, height: 16 }} />
-        {t("Retour auto à l’attente")}
-      </label>
-      <div className="flex flex-col gap-0.5 max-h-44 overflow-y-auto scroll pr-1">
-        {cur.parts.length === 0 && <span className="text-[12.5px] text-mut">{t("Aucune partie listée.")}</span>}
-        {cur.parts.map((p) => {
-          const on = cur.auto ? (cur.base[p.hash] ?? p.visible) : (cur.manual[p.hash] ?? cur.base[p.hash] ?? p.visible);
-          return (
-            <label
-              key={p.hash}
-              className="flex items-center gap-2 px-2 h-8 shrink-0 cut-sm text-[13px] font-semibold"
-              style={{ background: "var(--surf2)", opacity: cur.auto ? 0.75 : 1, cursor: cur.auto ? "default" : "pointer" }}
-            >
-              <input
-                type="checkbox"
-                checked={on}
-                disabled={cur.auto}
-                onChange={(e) => stage.setPart(cur.id, p.hash, e.target.checked)}
-                style={{ accentColor: "var(--acc)", width: 15, height: 15 }}
-              />
-              <span className="flex-auto truncate">{p.name}</span>
-            </label>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-/** Vide tout ce que le navigateur persiste (localStorage, session, IndexedDB, caches, workers) puis recharge. */
-async function wipeBrowserStorage(): Promise<void> {
-  try {
-    localStorage.clear();
-  } catch {}
-  try {
-    sessionStorage.clear();
-  } catch {}
-  try {
-    const dbs = (await indexedDB.databases?.()) ?? [];
-    await Promise.all(
-      dbs.map(
-        (d) =>
-          d.name &&
-          new Promise<void>((res) => {
-            const req = indexedDB.deleteDatabase(d.name as string);
-            req.onsuccess = req.onerror = req.onblocked = () => res();
-          })
-      )
-    );
-  } catch {}
-  try {
-    for (const k of await caches.keys()) await caches.delete(k);
-  } catch {}
-  try {
-    for (const r of (await navigator.serviceWorker?.getRegistrations?.()) ?? []) await r.unregister();
-  } catch {}
-  location.reload();
-}
-
-function PanelBtn({ onClick, children, danger, busy }: { onClick: () => void; children: React.ReactNode; danger?: boolean; busy: boolean }) {
-  return (
-    <button
-      type="button"
-      disabled={busy}
-      onClick={onClick}
-      className="h-10 px-3.5 border-0 cut-sm cursor-pointer font-bold text-[13px] text-ink disabled:opacity-50"
-      style={{ background: danger ? "color-mix(in srgb, var(--danger) 22%, var(--surf2))" : "var(--surf2)" }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function NumField({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
-  return (
-    <div className="fr-in w-28 p-[1.5px] bg-line cut-sm">
-      <input
-        type="number"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label={label}
-        className="block w-full box-border h-[37px] px-3 border-0 outline-none bg-surf text-ink cut-sm font-b text-sm font-semibold"
-      />
-    </div>
-  );
-}
-
-/** Réglage en direct des modèles 3D affichés : taille, position, rotation, animation ; code à recopier. */
-function ModelSection() {
-  const t = useT();
-  const tuning = useModelTuning();
-  const stems = [...new Set(tuning.active.map((a) => a.stem))];
-  const [sel, setSel] = useState("");
-  const [scope, setScope] = useState<"model" | "placement">("model");
-  const cur = stems.includes(sel) ? sel : stems[0];
-  const placement = tuning.active.find((a) => a.stem === cur)?.placement ?? "accueil";
-  const values = scope === "model" ? modelTuning(cur ?? "") : placementTuning(placement);
-  const m = motion();
-  const c = camera();
-  const set = (k: "zoom" | "x" | "y" | "yaw", v: number) => (scope === "model" ? tuning.setModel(cur!, { [k]: v }) : tuning.setPlacement(placement, { [k]: v }));
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(exportCode());
-      useUi.getState().toast(t("Code copié : colle-le dans packages/content/src/chibis.ts."), "ok");
-    } catch {
-      useUi.getState().toast(t("Copie impossible dans ce navigateur."), "danger");
-    }
-  };
-
-  return (
-    <section className="flex flex-col gap-2">
-      <span className="label">{t("Modèles 3D")}</span>
-      {!cur ? (
-        <span className="text-[13px] text-mut">{t("Aucun modèle 3D affiché sur cette page (accueil, profil ou vitrine des skins).")}</span>
-      ) : (
-        <>
-          <div className="flex flex-wrap gap-1.5 items-center">
-            <select
-              value={cur}
-              onChange={(e) => setSel(e.target.value)}
-              aria-label={t("Modèle à régler")}
-              className="h-9 px-2 border border-line bg-surf2 text-ink cut-sm text-[13px] font-semibold"
-            >
-              {stems.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-            <span role="group" aria-label={t("Portée du réglage")} className="flex gap-1">
-              {(
-                [
-                  ["model", "Ce modèle"],
-                  ["placement", "Cet emplacement"]
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setScope(id)}
-                  aria-pressed={scope === id}
-                  className="h-9 px-2.5 border-0 cut-sm cursor-pointer text-[12.5px] font-bold"
-                  style={{ background: scope === id ? "var(--acc)" : "var(--surf2)", color: scope === id ? "var(--on-acc)" : "var(--ink)" }}
-                >
-                  {t(label)}
-                </button>
-              ))}
-            </span>
-          </div>
-          <span className="text-[12px] text-mut">
-            {scope === "model" ? t("Réglage de {m}, partout où il s’affiche.", { m: cur }) : t("Réglage de tous les modèles sur l’emplacement « {p} ».", { p: placement })}
-          </span>
-          <Slider label={t("Taille")} value={values.zoom ?? 1} min={0.4} max={2.5} step={0.01} format={(v) => "×" + v.toFixed(2)} onChange={(v) => set("zoom", v)} />
-          <Slider label={t("Horizontal")} value={values.x ?? 0} min={-0.5} max={0.5} step={0.005} format={(v) => (v * 100).toFixed(1) + " %"} onChange={(v) => set("x", v)} />
-          <Slider label={t("Vertical")} value={values.y ?? 0} min={-0.5} max={0.5} step={0.005} format={(v) => (v * 100).toFixed(1) + " %"} onChange={(v) => set("y", v)} />
-          <Slider label={t("Rotation")} value={values.yaw ?? 0} min={-180} max={180} step={1} format={(v) => v + "°"} onChange={(v) => set("yaw", v)} />
-        </>
-      )}
-      <span className="label !text-[11.5px] pt-1">{t("Animation (tous les modèles)")}</span>
-      <Slider label={t("Balancement")} value={m.sway} min={0} max={25} step={1} format={(v) => v + "°"} onChange={(v) => tuning.setMotion({ sway: v })} />
-      <Slider label={t("Flottement")} value={m.float} min={0} max={20} step={1} format={(v) => v + " px"} onChange={(v) => tuning.setMotion({ float: v })} />
-      <span className="label !text-[11.5px] pt-1">{t("Caméra (tous les modèles)")}</span>
-      <Slider label={t("Hauteur")} value={c.pitch} min={60} max={110} step={1} format={(v) => v + "°"} onChange={(v) => tuning.setCamera({ pitch: v })} />
-      <Slider label={t("Perspective")} value={c.fov} min={10} max={60} step={1} format={(v) => v + "°"} onChange={(v) => tuning.setCamera({ fov: v })} />
-      <div className="flex flex-wrap gap-1.5 pt-1">
-        <PanelBtn busy={false} onClick={copy}>
-          {t("Copier le code")}
-        </PanelBtn>
-        <PanelBtn busy={false} danger onClick={() => tuning.reset()}>
-          {t("Réinitialiser")}
-        </PanelBtn>
-      </div>
-    </section>
-  );
-}
-
-function Slider({ label, value, min, max, step, format, onChange }: { label: string; value: number; min: number; max: number; step: number; format: (v: number) => string; onChange: (v: number) => void }) {
-  return (
-    <label className="flex items-center gap-2.5 text-[13px] font-semibold">
-      <span className="w-[78px] shrink-0">{label}</span>
-      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="flex-auto" style={{ accentColor: "var(--acc)" }} />
-      <span className="w-[58px] shrink-0 text-right font-d text-mut">{format(value)}</span>
-    </label>
   );
 }

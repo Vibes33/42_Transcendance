@@ -19,6 +19,7 @@ services:
       - /app/packages/shared/node_modules
       - /app/packages/content/node_modules
     environment:
-      # Les événements inotify ne traversent pas toujours le partage de fichiers
-      # Windows <-> Docker : le polling garantit que Vite voit chaque sauvegarde.
-      VITE_POLL_WATCH: "1"
+      # Inotify traverse les bind-mounts sur Linux : laisser à "0".
+      # Mettre "1" uniquement sous Windows/Mac (Docker Desktop) où les
+      # événements ne traversent pas toujours, au prix de CPU/RAM élevés.
+      VITE_POLL_WATCH: "0"

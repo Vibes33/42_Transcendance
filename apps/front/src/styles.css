@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Tailwind v4 scanne par défaut tout le projet à la recherche de classes.
+   Sans ces exclusions il lit les 690 .glb binaires de public/models (~730 Mo)
+   comme du texte à chaque reload -> pic RAM 5-9 Go puis SIGKILL du conteneur. */
+@source not "../public";
+@source not "../dist";
+
 /* Identité visuelle de la maquette : formes coupées, palettes Ardoise (sombre) et Porcelaine (clair).
    Les couleurs sont des variables CSS ; Tailwind les expose en utilitaires (bg-surf, text-acc…). */
 

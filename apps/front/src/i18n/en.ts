@@ -698,6 +698,8 @@ export const EN: Record<string, string> = {
   "Ouvrir le panneau de test": "Open the test panel",
   "Panneau de test": "Test panel",
   "Fermer le panneau de test": "Close the test panel",
+  "Anims": "Anims",
+  "Système": "System",
   "Compte de test uniquement. Solde : {n} éclats": "Test accounts only. Balance: {n} shards",
   "Éclats": "Shards",
   "+{n} éclats": "+{n} shards",
