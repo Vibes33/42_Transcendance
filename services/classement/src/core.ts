@@ -208,13 +208,19 @@ export function paySeasons(db: Db, now: number, friends: Record<string, string[]
   return paid;
 }
 
-/** Rang (Bronze → Challenger) d'après la part des meilleurs joueurs de la saison. */
-export function rankOf(db: Db, userId: string, season: number) {
+/**
+ * Rang (Bronze → Challenger) et position mondiale d'après les points de la saison, journée en cours
+ * comprise en prévisionnel : les mêmes points que le classement mondial affiché. `points` évite de
+ * les recalculer pour chaque ligne d'un classement.
+ */
+export function rankOf(db: Db, userId: string, season: number, now: number, points = periodPoints(db, null, "saison", now)) {
   const me = db.select().from(seasonPoints).where(and(eq(seasonPoints.userId, userId), eq(seasonPoints.season, season))).get();
-  const total = db.select({ n: sql<number>`count(*)` }).from(seasonPoints).where(and(eq(seasonPoints.season, season), gt(seasonPoints.points, 0))).get()?.n ?? 0;
-  if (!me || me.points <= 0 || total === 0) return { ...rankFor(1), position: null as number | null, total, points: me?.points ?? 0, daysPlayed: me?.daysPlayed ?? 0 };
-  const better = db.select({ n: sql<number>`count(*)` }).from(seasonPoints).where(and(eq(seasonPoints.season, season), gt(seasonPoints.points, me.points))).get()?.n ?? 0;
-  return { ...rankFor((better + 1) / total), position: better + 1, total, points: me.points, daysPlayed: me.daysPlayed };
+  const daysPlayed = me?.daysPlayed ?? 0;
+  const mine = points.get(userId) ?? 0;
+  const all = [...points.values()].filter((p) => p > 0);
+  if (mine <= 0 || all.length === 0) return { ...rankFor(1), position: null as number | null, total: all.length, points: mine, daysPlayed };
+  const better = all.filter((p) => p > mine).length;
+  return { ...rankFor((better + 1) / all.length), position: better + 1, total: all.length, points: mine, daysPlayed };
 }
 
 /** Points d'un ensemble de joueurs sur une période (définitifs + aujourd'hui en prévisionnel). */

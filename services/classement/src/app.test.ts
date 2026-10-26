@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { BONUS_TIERS, dayKey, type RoundResult } from "@loltr/shared";
 import { createClassementApp } from "./app";
-import { balanceOf, finalizeDays, grantDailyUnlocks, mergeGuest, paySeasons, projection, recordCompleted, recordResult, streakOf } from "./core";
+import { balanceOf, finalizeDays, grantDailyUnlocks, mergeGuest, paySeasons, projection, rankOf, recordCompleted, recordResult, streakOf } from "./core";
 import { rotationFor } from "@loltr/shared";
 import { createDb } from "./db";
 
@@ -38,6 +38,20 @@ describe("classement", () => {
     expect(balanceOf(db, "u1")).toBe(5 * 40 + 50);
     expect(streakOf(db, "u1", "2026-10-23").current).toBe(5);
     expect(streakOf(db, "u1", "2026-10-25").current).toBe(0);
+  });
+
+  test("position mondiale : mêmes points que le classement, journée en cours comprise", () => {
+    const db = createDb(":memory:");
+    const yesterday = dayKey(T - 86_400_000);
+    // Hier : a devant b (journée close) ; aujourd'hui seul b joue et passe devant
+    recordResult(db, { ...cdj("a", 1), day: yesterday }, T - 86_400_000);
+    recordResult(db, { ...cdj("b", 5), day: yesterday }, T - 86_400_000);
+    finalizeDays(db, T + 3600_000);
+    recordResult(db, cdj("b", 1), T);
+    const season = rankOf(db, "a", 0, T).total;
+    expect(season).toBe(2);
+    expect(rankOf(db, "b", 0, T).position).toBe(1);
+    expect(rankOf(db, "a", 0, T).position).toBe(2);
   });
 
   test("clôture du jour : points de saison et éclats par tranche de 500", () => {

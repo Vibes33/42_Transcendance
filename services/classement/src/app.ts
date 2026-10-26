@@ -19,13 +19,13 @@ export function createClassementApp(deps: ClassementDeps) {
   const { db } = deps;
   const now = deps.now ?? Date.now;
 
-  async function rows(ids: string[], points: Map<string, number>, season: number, today: string): Promise<LeaderRow[]> {
+  async function rows(ids: string[], points: Map<string, number>, season: number, today: string, global: Map<string, number>): Promise<LeaderRow[]> {
     const sorted = ids.filter((id) => (points.get(id) ?? 0) > 0).sort((a, b) => (points.get(b) ?? 0) - (points.get(a) ?? 0));
     const profiles = Object.fromEntries((await deps.players(sorted)).map((p) => [p.userId, p]));
     return sorted
       .filter((id) => profiles[id])
       .map((id, i) => {
-        const r = rankOf(db, id, season);
+        const r = rankOf(db, id, season, now(), global);
         return { ...profiles[id], rank: i + 1, points: points.get(id) ?? 0, tier: r.id, division: r.division, streak: streakOf(db, id, today).current };
       });
   }
@@ -44,7 +44,7 @@ export function createClassementApp(deps: ClassementDeps) {
       const me = requireSession(caller);
       const today = dayKey(now());
       const season = seasonOf(today, now());
-      const rank = rankOf(db, me, season.number);
+      const rank = rankOf(db, me, season.number, now());
       const recent = db.select().from(ledger).where(and(eq(ledger.userId, me), gt(ledger.delta, 0))).orderBy(desc(ledger.at)).limit(8).all();
       return {
         balance: balanceOf(db, me),
@@ -71,7 +71,8 @@ export function createClassementApp(deps: ClassementDeps) {
           ids = [me, ...(await deps.friends(me))];
         }
         const pts = periodPoints(db, ids, period, now());
-        const list = await rows(ids ?? [...pts.keys()], pts, season.number, today);
+        const global = !ids && period === "saison" ? pts : periodPoints(db, null, "saison", now());
+        const list = await rows(ids ?? [...pts.keys()], pts, season.number, today, global);
         const meId = caller.kind === "user" ? caller.id : null;
         const meRow = meId ? list.find((r) => r.userId === meId) ?? null : null;
         return {
@@ -80,7 +81,7 @@ export function createClassementApp(deps: ClassementDeps) {
           season: { number: season.number, endsAt: season.endsAt, progress: season.progress },
           rows: list.slice(0, 100),
           me: meRow,
-          myRank: meId ? rankOf(db, meId, season.number) : null,
+          myRank: meId ? rankOf(db, meId, season.number, now(), global) : null,
           friendsTotal: ids ? ids.length : null
         };
       },

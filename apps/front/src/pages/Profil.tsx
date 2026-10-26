@@ -37,8 +37,8 @@ export function Profil() {
   const [cIdx, setCIdx] = useState<number | null>(null);
   const [vitrine, setVitrine] = useState<string | null>(null);
   // Carrousel fluide : la bande contient tous les chibis et défile en continu
-  // (scrollLeft animé en easeInOut), la sélection suit le mouvement, puis la vitrine
-  // s'ouvre à l'arrivée.
+  // (scrollLeft animé en easeInOut). La sélection ne change qu'à l'arrivée (sinon chaque carte
+  // traversée grandit puis rapetisse : effet de rebond), puis la vitrine s'ouvre.
   // (Déclaré avant les retours anticipés : les hooks ne peuvent pas être conditionnels.)
   const stripRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -135,16 +135,10 @@ export function Profil() {
     const dur = Math.min(900, 220 + dist * 45);
     const t0 = performance.now();
     gliding.current = true;
-    let last = cur0;
     const frame = (now: number) => {
       const p = Math.min(1, (now - t0) / dur);
       const e = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
       strip.scrollLeft = from + (to - from) * e;
-      const v = clamp(Math.round(cur0 + (t - cur0) * e));
-      if (v !== last) {
-        last = v;
-        setCIdx(v);
-      }
       if (p < 1) {
         raf.current = requestAnimationFrame(frame);
       } else {

@@ -144,8 +144,12 @@ function setupMaterial(me: any) {
   me.frustumCulled = false;
   if (ud.renderOrder) me.renderOrder = ud.renderOrder;
   // Les décalques du visage (yeux, bouche) sont transparents : sans écriture de profondeur, le visage
-  // dessiné ensuite les recouvre
-  if (mat.transparent) mat.depthWrite = true;
+  // dessiné ensuite les recouvre. Leurs pixels vides sont écartés : sinon ils écrivent aussi la
+  // profondeur et percent le visage d'un rectangle sombre autour de la bouche (Sett)
+  if (mat.transparent) {
+    mat.depthWrite = true;
+    mat.alphaTest = Math.max(mat.alphaTest ?? 0, 0.02);
+  }
   if (ud.depthWrite !== undefined) mat.depthWrite = ud.depthWrite;
   if (ud.blendMode === "Additive") {
     mat.blending = 2;
