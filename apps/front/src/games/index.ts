@@ -51,8 +51,8 @@ export const GAME_UI: Record<GameKey, { component: ComponentType<GameProps>; tut
   splash: {
     component: SplashMystere,
     tutorial: [
-      { target: "splash-image", title: "Un splash art caché", text: "L’image est très zoomée et floue. À chaque erreur, elle se dévoile un peu plus." },
-      { target: "splash-steps", title: "Le zoom se dévoile", text: "Six crans de zoom : chaque erreur dézoome et défloute un peu l’image." },
+      { target: "splash-image", title: "Un splash art caché", text: "L’image est très zoomée. À chaque erreur, elle se dévoile un peu plus." },
+      { target: "splash-steps", title: "Le zoom se dévoile", text: "Six crans de zoom : chaque erreur dézoome un peu l’image." },
       { target: "splash-input", title: "Champion, puis skin", text: "Le champion vaut 70 points. Ensuite, une seule tentative pour le skin, qui vaut 30 points." }
     ]
   },

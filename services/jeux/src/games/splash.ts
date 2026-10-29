@@ -1,8 +1,8 @@
-import { SPLASH_BLUR, SPLASH_SCALE, pick, rng, shuffle } from "@loltr/shared";
+import { SPLASH_SCALE, pick, rng, shuffle } from "@loltr/shared";
 import { CHAMPIONS, CHAMPION_BY_ID, img } from "@loltr/content";
 import { GameError, resolveChampion, type GameEngine } from "./engine";
 
-// Splash mystère : un splash art très zoomé et flou se dévoile à chaque erreur (6 crans).
+// Splash mystère : un splash art très zoomé se dévoile à chaque erreur (6 crans).
 // Champion trouvé = 70 points, puis une seule tentative sur le skin (4 choix) = 30 points.
 
 interface S {
@@ -39,7 +39,6 @@ export const splash: GameEngine<S> = {
     return {
       step: st,
       scale: SPLASH_SCALE[st],
-      blur: SPLASH_BLUR[st],
       origin: s.origin,
       misses: s.misses,
       found: s.found,

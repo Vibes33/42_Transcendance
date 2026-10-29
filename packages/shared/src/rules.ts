@@ -91,7 +91,6 @@ export const SE_BONUS_MS = 3_000;
 export const WARMUP_MS = 1_000;
 /** Splash mystère : dézoom en 6 crans, un par erreur. */
 export const SPLASH_SCALE = [3.2, 2.6, 2.1, 1.75, 1.45, 1.2, 1];
-export const SPLASH_BLUR = [14, 10, 7, 4.5, 2.5, 1, 0];
 /** Portrait mystère : 5 portraits, 5 lignes chacun ; 100 points à la 1re ligne, 20 de moins par ligne. */
 export const PORTRAIT_ROUNDS = 5;
 export const PORTRAIT_LINES = 5;

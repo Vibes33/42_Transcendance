@@ -6,13 +6,12 @@ import { Zoom } from "../components/icons";
 import { useT } from "../i18n";
 import type { GameProps } from "./types";
 
-// Splash mystère : un vrai splash art très zoomé et flou, qui se dévoile à chaque erreur (6 crans).
+// Splash mystère : un vrai splash art très zoomé, qui se dévoile à chaque erreur (6 crans).
 // Champion trouvé = 70 points ; ensuite une seule tentative sur le skin (4 choix) = 30 points.
 
 interface Pub {
   step: number;
   scale: number;
-  blur: number;
   origin: string;
   misses: string[];
   found: boolean;
@@ -37,7 +36,6 @@ export function SplashMystere({ round, act, finish, flow, groupSize, namesLang }
   const bonus = pub.found && pub.skinPick === null && !round.over;
   const playing = !pub.found && !round.over;
   const scale = round.over ? 1 : pub.scale;
-  const blur = round.over ? 0 : pub.blur;
 
   const guess = async (a: { champion?: string; text?: string }) => {
     const res = await act({ type: "guess", ...a }).catch(() => null);
@@ -64,7 +62,7 @@ export function SplashMystere({ round, act, finish, flow, groupSize, namesLang }
                 draggable={false}
                 onContextMenu={(e) => e.preventDefault()}
                 className="block w-full h-full object-cover select-none"
-                style={{ transform: `scale(${scale})`, transformOrigin: pub.origin, filter: `blur(${blur}px)`, transition: "transform .7s ease, filter .7s ease" }}
+                style={{ transform: `scale(${scale})`, transformOrigin: pub.origin, transition: "transform .7s ease" }}
               />
               <span className="absolute left-[22px] top-[18px] flex items-center gap-2 h-[34px] px-3.5 cut-sm font-d font-bold text-[15px]" style={{ background: "color-mix(in srgb, var(--bg) 72%, transparent)" }}>
                 <Zoom className="text-acc" />

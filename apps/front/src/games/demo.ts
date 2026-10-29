@@ -1,5 +1,5 @@
 import { LITE_BY_ID, LITE_CHAMPIONS, mayhemRating, spellImg, splashImg, type ChampionAttributes } from "@loltr/content/lite";
-import { CDJ_MAX_MS, CDJ_MAX_TRIES, SPLASH_BLUR, SPLASH_SCALE, WARMUP_MS, type GameKey, type RoundState } from "@loltr/shared";
+import { CDJ_MAX_MS, CDJ_MAX_TRIES, SPLASH_SCALE, WARMUP_MS, type GameKey, type RoundState } from "@loltr/shared";
 
 // Manches d'exemple pour les tutoriels : le vrai jeu s'affiche avec un contenu de démonstration,
 // sans créer de manche côté serveur (le chrono ne démarre qu'après le tutoriel).
@@ -75,6 +75,6 @@ export function demoRound(game: GameKey): RoundState<any> {
     ...base,
     endsAt: null,
     warmUntil: null,
-    public: { step: 0, scale: SPLASH_SCALE[0], blur: SPLASH_BLUR[0], origin: "50% 35%", misses: [], found: false, champion: null, skinChoices: [], skinPick: null, over: false, demoImage: splashImg(ahri, 0) }
+    public: { step: 0, scale: SPLASH_SCALE[0], origin: "50% 35%", misses: [], found: false, champion: null, skinChoices: [], skinPick: null, over: false, demoImage: splashImg(ahri, 0) }
   };
 }
