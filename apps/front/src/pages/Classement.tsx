@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLeaderboard } from "../api/queries";
 import { Back } from "../components/icons";
-import { glow } from "../components/ui";
+import { Pill, glow } from "../components/ui";
 import { fmt, plural, useT } from "../i18n";
 import { avatarOf } from "../lib/chibi";
 import { tierLabel } from "../lib/ranks";
@@ -10,10 +10,12 @@ import { daysHoursMinutes, useNow } from "../lib/time";
 import { useMe } from "../state/app";
 import { useUi } from "../state/ui";
 
-// Leaderboard : mondial ou entre copains, aujourd'hui, cette semaine ou depuis toujours ; podium,
-// liste et ta position. La saison dure 4 semaines.
+// Leaderboard : mondial ou entre copains, sur la saison en cours (4 semaines) ; podium, top 100
+// paginé et ta position.
 
 type Scope = "mondial" | "copains";
+/** Joueurs par page de la liste (le top 100 tient sur 5 pages). */
+const PAGE = 20;
 
 export function Classement() {
   const t = useT();
@@ -30,6 +32,10 @@ export function Classement() {
   const days = (n: number) => t("{n} " + plural(n, "jour", "jours"), { n });
   const myId = me.profile?.userId;
   const podium = [rows[1], rows[0], rows[2]].filter(Boolean);
+  const [page, setPage] = useState(0);
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE));
+  useEffect(() => setPage(0), [scope]);
+  const shown = rows.slice(page * PAGE, (page + 1) * PAGE);
   const heights = { 1: 340, 2: 290, 3: 260 } as Record<number, number>;
 
   return (
@@ -110,9 +116,18 @@ export function Classement() {
                 <span className="basis-[84px] shrink-0">{t("Série")}</span>
                 <span className="basis-[100px] shrink-0 text-right">{t("Points")}</span>
               </div>
-              {rows.slice(3).map((r) => (
+              {shown.map((r) => (
                 <Row key={r.userId} rank={String(r.rank)} img={r.userId === myId ? me.meImg : avatarOf(r)} name={r.pseudo + (r.userId === myId ? " " + t("(toi)") : "")} tier={tierLabel(r.tier, r.division)} streak={days(r.streak)} pts={pts(r.points)} me={r.userId === myId} />
               ))}
+              {pages > 1 && (
+                <nav aria-label={t("Pages du classement")} className="flex flex-wrap items-center justify-center gap-1.5 pt-3">
+                  {Array.from({ length: pages }, (_, i) => (
+                    <Pill key={i} on={i === page} onClick={() => setPage(i)} className="!px-4 !text-[13px]">
+                      {i * PAGE + 1}–{Math.min(rows.length, (i + 1) * PAGE)}
+                    </Pill>
+                  ))}
+                </nav>
+              )}
               {scope === "mondial" && me.isUser && data?.myRank && (
                 <div className="flex flex-col gap-1.5 mt-2.5 pt-3.5 border-t border-line">
                   <span className="px-[18px] label">{t("Ta position")}</span>

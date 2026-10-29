@@ -44,3 +44,17 @@ export const seen = sqliteTable(
   { userId: text("user_id").notNull(), game: text("game").notNull(), contentKey: text("content_key").notNull(), at: integer("at").notNull() },
   (t) => [primaryKey({ columns: [t.userId, t.game, t.contentKey] })]
 );
+
+/** Jeux de groupe à plateau partagé (Codenames, Fais-moi deviner) : un état pour tout le groupe. */
+export const parties = sqliteTable(
+  "parties",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id").notNull(),
+    game: text("game").notNull(),
+    state: text("state", { mode: "json" }).notNull(),
+    over: integer("over", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at").notNull()
+  },
+  (t) => [index("parties_session").on(t.sessionId, t.game)]
+);

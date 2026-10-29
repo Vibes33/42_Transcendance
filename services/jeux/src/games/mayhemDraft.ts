@@ -77,6 +77,7 @@ export function botFill(seed: string, count: number, takenCrests: string[] = [])
   );
   return Array.from({ length: count }, (_, k) => {
     const picks = botDraft(seed + ":bot" + k);
-    return { kind: "bot" as const, picks, rating: mayhemRating(picks).rating, crest: crests[k % crests.length] };
+    const crest = crests[k % crests.length];
+    return { kind: "bot" as const, picks, rating: mayhemRating(picks, crest.id).rating, crest };
   });
 }

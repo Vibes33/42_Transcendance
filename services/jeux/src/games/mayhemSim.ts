@@ -26,8 +26,14 @@ const pick = <T>(r: R, xs: readonly T[]): T => xs[Math.floor(r() * xs.length)];
 const int = (r: R, lo: number, hi: number) => lo + Math.floor(r() * (hi - lo + 1));
 const some = (r: R, n: number) => shuffle([0, 1, 2, 3, 4], r).slice(0, Math.max(0, Math.min(5, n)));
 
+/**
+ * Écart de note qui fait passer de 50 % à 73 % de chances de gagner une partie : plus il est petit,
+ * moins le hasard compte (une équipe bien plus forte gagne presque toujours).
+ */
+export const MAYHEM_SPREAD = 3;
+
 /** Probabilité de victoire d'une partie (écart de note d'équipe). */
-export const winProb = (ra: number, rb: number) => 1 / (1 + Math.exp(-(ra - rb) / 6));
+export const winProb = (ra: number, rb: number) => 1 / (1 + Math.exp(-(ra - rb) / MAYHEM_SPREAD));
 
 const near = (r: R, [x, y]: [number, number], spread = 2.5): [number, number] => [+(x + (r() - 0.5) * spread).toFixed(1), +(y + (r() - 0.5) * spread).toFixed(1)];
 const SPOTS: [number, number][] = [[9, 30], [27, 8.5], [50, 50], [44, 56], [56, 44], [80, 91.5], [91.5, 74], ...RIFT.camps.map((c) => c.at)];

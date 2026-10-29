@@ -10,6 +10,7 @@
   "scripts": {
     "content:import": "bun run packages/content/scripts/import-ddragon.ts && bun run packages/content/scripts/build-lite.ts",
     "content:check": "bun run packages/content/scripts/check-attributes.ts",
+    "content:items": "bun run packages/content/scripts/import-items.ts",
     "test": "bun test",
     "typecheck": "bunx tsc -p tsconfig.json --noEmit",
     "db:generate": "for s in auth profil social jeux classement; do (cd services/$s && bunx drizzle-kit generate); done",

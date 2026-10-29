@@ -29,6 +29,27 @@ describe("World Mayhem", () => {
     expect(mayhemRating({ adc: { t: "t1-23", i: 3 }, sup: { t: "drx-22", i: 4 } }).linkBonus).toBe(0);
   });
 
+  test("anciens coéquipiers : un lien même si ce n'est pas la même année", () => {
+    // Faker (T1 2022) et Keria (T1 2024) ont joué ensemble en 2022, 2023, 2024 et 2025 : léger bonus
+    const r = mayhemRating({ mid: { t: "t1-22", i: 2 }, sup: { t: "t1-24", i: 4 } });
+    expect(r.links.map((l) => [l.same, l.bonus])).toEqual([["passe", 1]]);
+    // Un duo bot d'années différentes vaut la moitié du duo du même roster (+4 → +2)
+    expect(mayhemRating({ adc: { t: "t1-23", i: 3 }, sup: { t: "t1-24", i: 4 } }).links[0]).toMatchObject({ same: "passe", bonus: 2 });
+    // Jamais coéquipiers : aucun lien
+    expect(mayhemRating({ mid: { t: "t1-22", i: 2 }, sup: { t: "drx-22", i: 4 } }).linkBonus).toBe(0);
+  });
+
+  test("écusson : 3 joueurs de la structure +1, 4 ou plus +2, sans écusson ou autre structure rien", () => {
+    const three = { top: { t: "t1-23", i: 0 }, jgl: { t: "t1-24", i: 1 }, mid: { t: "t1-22", i: 2 }, adc: { t: "drx-22", i: 3 }, sup: { t: "dwg-20", i: 4 } };
+    const bonus = (picks: typeof three, crest?: string) => mayhemRating(picks, crest).links.filter((l) => l.same === "ecusson").map((l) => l.bonus);
+    expect(bonus(three, "t1")).toEqual([1]);
+    expect(bonus(three)).toEqual([]);
+    expect(bonus(three, "drx")).toEqual([]);
+    expect(bonus({ ...three, adc: { t: "t1-25", i: 3 } }, "t1")).toEqual([2]);
+    // Karmine Corp n'a pas de roster aux Worlds : pas de bonus
+    expect(bonus(three, "karminecorp")).toEqual([]);
+  });
+
   test("un poste ne se prend qu'une fois, et chaque choix tire une nouvelle équipe", () => {
     let s = mayhem.create({ seed: "x", now: T0, seen: new Set() }).state;
     s = mayhem.act(s, { type: "pick", index: 2 }, T0).state;

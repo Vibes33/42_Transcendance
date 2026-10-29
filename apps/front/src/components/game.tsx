@@ -52,7 +52,7 @@ export function GameBar({ game, sub, counterLabel, counter, onQuit }: { game: Ga
       <div className="flex items-baseline gap-3 flex-wrap justify-center">
         <span className="font-d font-bold text-[22px] tracking-[0.04em] uppercase">
           {t(a)}
-          {game === "meli" ? "" : " "}
+          {game === "meli" || game === "chaudfroid" ? "" : " "}
           <span className="text-acc">{t(b)}</span>
         </span>
         {sub && <span className="text-sm text-mut">{sub}</span>}
@@ -222,6 +222,9 @@ export function TimerBar({ leftMs, totalMs, tuto }: { leftMs: number; totalMs: n
   );
 }
 
+/** Jeux classés au score de la manche (ajoutés après le lancement). */
+const scored = (game: GameKey) => !["cdj", "meli", "se", "splash", "mayhem"].includes(game);
+
 /** Mesure affichée dans le classement en direct, sans rien dévoiler de la réponse. */
 function liveScore(game: GameKey, m: LiveMember, index: number, progress: LiveMember["progress"]) {
   const r = m.results[index];
@@ -231,9 +234,10 @@ function liveScore(game: GameKey, m: LiveMember, index: number, progress: LiveMe
     if (game === "meli") return { v: s?.champions ?? 0, done: true, ok: (s?.champions ?? 0) > 0, tries: 0 };
     if (game === "se") return { v: s?.correct ?? 0, done: true, ok: (s?.correct ?? 0) > 0, tries: 0 };
     if (game === "mayhem") return { v: (s?.rating ?? 0) + 2 * (s?.wins ?? 0), done: true, ok: true, tries: 0 };
+    if (scored(game)) return { v: s?.score ?? 0, done: true, ok: (s?.score ?? 0) > 0, tries: 0 };
     return { v: s?.found ? 1 : 0, done: true, ok: !!s?.found, tries: s?.tries ?? 99 };
   }
-  if (game === "meli" || game === "se" || game === "mayhem") return { v: p?.score ?? 0, done: false, ok: (p?.score ?? 0) > 0, tries: 0 };
+  if (game === "meli" || game === "se" || game === "mayhem" || scored(game)) return { v: p?.score ?? 0, done: false, ok: (p?.score ?? 0) > 0, tries: 0 };
   return { v: p?.found ? 1 : 0, done: false, ok: !!p?.found, tries: p?.tries ?? 0 };
 }
 
@@ -244,7 +248,7 @@ export function LiveRanking({ game, members, index, progress, meId }: { game: Ga
   const rows = members
     .filter((m) => m.status !== "left")
     .map((m) => ({ m, s: liveScore(game, m, index, progress[m.userId]) }));
-  const timed = game === "meli" || game === "se";
+  const timed = game === "meli" || game === "se" || scored(game);
   const order = [...rows].sort((a, b) => (timed ? b.s.v - a.s.v : Number(b.s.ok) - Number(a.s.ok) || (a.s.ok ? a.s.tries - b.s.tries : b.s.tries - a.s.tries)));
   // Ordre d'affichage stable (le DOM ne bouge pas) : seule la position verticale change
   const fixed = [...rows].sort((a, b) => a.m.userId.localeCompare(b.m.userId));

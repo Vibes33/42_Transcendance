@@ -88,7 +88,7 @@ export interface MayhemLink {
   kind: string;
   /** Roster ou structure concerné (« T1 2023 », « T1 »). */
   ref: string;
-  same: "roster" | "structure" | "noyau";
+  same: "roster" | "structure" | "noyau" | "passe" | "ecusson";
   bonus: number;
 }
 
@@ -103,7 +103,23 @@ export interface MayhemRating {
 export const mayhemLabel = (t: MayhemTeam) => `${t.name} ${t.year}`;
 export const pickedPlayer = (p: MayhemPick) => MAYHEM_TEAM_BY_ID[p.t]?.players[p.i];
 
-export function mayhemRating(picks: MayhemPicks): MayhemRating {
+/** Rosters (saisons) où chaque joueur a joué, par nom : sert aux liens entre années différentes. */
+const SEASONS_OF: Record<string, Set<string>> = {};
+for (const t of MAYHEM_TEAMS) for (const p of t.players) (SEASONS_OF[p.name] ??= new Set()).add(t.id);
+/** Saisons jouées ensemble par deux joueurs (Keria et Faker : T1 2022, 2023, 2024, 2025). */
+const seasonsTogether = (a: string, b: string) => [...(SEASONS_OF[a] ?? [])].filter((id) => SEASONS_OF[b]?.has(id)).length;
+
+const slug = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+/** Structure d'un écusson (même nom que l'organisation, ex. « T1 »), ou null (Karmine Corp : aucun roster). */
+const ORG_OF_CREST: Record<string, string> = Object.fromEntries(MAYHEM_TEAMS.map((t) => [slug(t.org), t.org]));
+export const crestOrg = (crestId: string | null | undefined) => (crestId ? (ORG_OF_CREST[crestId] ?? null) : null);
+
+/**
+ * Note d'équipe. Liens : même roster (+ poids du duo), joueurs qui ont déjà joué ensemble une autre
+ * année (léger bonus), même structure (moitié) ; noyau de 3 joueurs d'un même roster ; et, avec
+ * l'écusson d'une structure, 3 joueurs ou plus de cette structure.
+ */
+export function mayhemRating(picks: MayhemPicks, crestId?: string | null): MayhemRating {
   const chosen = MAYHEM_ROLES.map((r) => (picks[r] ? { role: r, team: MAYHEM_TEAM_BY_ID[picks[r]!.t], player: pickedPlayer(picks[r]!) } : null));
   const links: MayhemLink[] = [];
   for (let a = 0; a < 5; a++) {
@@ -116,13 +132,24 @@ export function mayhemRating(picks: MayhemPicks): MayhemRating {
       const roles: [MayhemRole, MayhemRole] = [pa.role, pb.role];
       const names = pa.player.name + " + " + pb.player.name;
       if (pa.team.id === pb.team.id) links.push({ roles, names, kind: def ? def[1] : "Même roster", ref: mayhemLabel(pa.team), same: "roster", bonus: w || 1 });
-      else if (pa.team.org === pb.team.org && Math.floor(w / 2) > 0) links.push({ roles, names, kind: def![1], ref: pa.team.org, same: "structure", bonus: Math.floor(w / 2) });
+      else {
+        // Déjà coéquipiers une autre année : léger bonus (moitié du poids du duo, au moins +1)
+        const together = seasonsTogether(pa.player.name, pb.player.name);
+        if (together > 0) links.push({ roles, names, kind: def ? def[1] : "Anciens coéquipiers", ref: String(together), same: "passe", bonus: Math.max(1, Math.floor(w / 2)) });
+        else if (pa.team.org === pb.team.org && Math.floor(w / 2) > 0) links.push({ roles, names, kind: def![1], ref: pa.team.org, same: "structure", bonus: Math.floor(w / 2) });
+      }
     }
   }
   const counts: Record<string, number> = {};
   for (const c of chosen) if (c) counts[c.team.id] = (counts[c.team.id] ?? 0) + 1;
   for (const [id, n] of Object.entries(counts)) {
     if (n >= 3) links.push({ roles: null, names: mayhemLabel(MAYHEM_TEAM_BY_ID[id]), kind: "Noyau", ref: String(n), same: "noyau", bonus: n >= 4 ? 5 : 3 });
+  }
+  // Écusson d'une structure : 3 joueurs ou plus de cette structure (toutes années) donnent un bonus d'équipe
+  const org = crestOrg(crestId);
+  if (org) {
+    const n = chosen.filter((c) => c && c.team.org === org).length;
+    if (n >= 3) links.push({ roles: null, names: org, kind: "Écusson", ref: String(n), same: "ecusson", bonus: n >= 4 ? 2 : 1 });
   }
   const ovrs = chosen.filter((c) => c).map((c) => c!.player.ovr);
   const avg = ovrs.length ? ovrs.reduce((s, x) => s + x, 0) / ovrs.length : 0;

@@ -240,10 +240,6 @@ export function WorldMayhem({ round, act, flow, groupSize }: GameProps<MayhemPub
     if (!finished) return setView({ step: view.step, watching: true });
     setSpec({ key: `b${ri}-${mi}`, match: m, game: 0, label: `${stageName(ri)} · Bo${m.bo}` });
   };
-  const watchGroup = (gi: number, mi: number) => {
-    const g = tour.groups[gi];
-    setSpec({ key: `g${g.name}-${mi}`, match: g.matches[mi], game: 0, label: t("Poule {g} · journée {n}", { g: g.name, n: Math.floor(mi / 2) + 1 }) });
-  };
   const shownTab = tab ?? (done ? (qualified ? "bracket" : "groups") : next?.kind === "group" ? "groups" : "bracket");
   const myMatch = (ri: number) => tour.rounds[ri].find((x) => x.a === mine || x.b === mine);
   const opponentOf = (m: MayhemMatch) => entrantName(t, tour.entrants[m.a === mine ? m.b : m.a], names, myId);
@@ -278,7 +274,7 @@ export function WorldMayhem({ round, act, flow, groupSize }: GameProps<MayhemPub
               </button>
             ))}
           </div>
-          <div className="flex-1 min-h-0">{shownTab === "groups" ? <Groups tour={tour} mine={mine} names={names} myId={myId} days={days} onWatch={finished ? watchGroup : undefined} /> : <Bracket tour={tour} mine={mine} names={names} myId={myId} known={known} revealed={revealed} canWatch={canWatch} onWatch={watchBracket} />}</div>
+          <div className="flex-1 min-h-0">{shownTab === "groups" ? <Groups tour={tour} mine={mine} names={names} myId={myId} days={days} /> : <Bracket tour={tour} mine={mine} names={names} myId={myId} known={known} revealed={revealed} canWatch={canWatch} onWatch={watchBracket} />}</div>
         </section>
         <aside aria-label={t("Ton parcours")} className="min-h-0 flex flex-col">
           <div className="p-[1.5px] bg-acc cut-md">
@@ -304,7 +300,7 @@ export function WorldMayhem({ round, act, flow, groupSize }: GameProps<MayhemPub
               ) : (
                 <>
                   <span className="font-d font-bold text-2xl">{tour.champion === mine ? t("Champion du World Mayhem !") : t("Éliminé : {place}", { place: place.toLowerCase() })}</span>
-                  <span className="text-[13px] text-mut text-center">{t("Clique un match de l’arbre ou des poules pour le regarder.")}</span>
+                  <span className="text-[13px] text-mut text-center">{t("Clique un match de l’arbre pour le regarder.")}</span>
                   <button type="button" onClick={() => send({ type: "done" })} disabled={busy || round.over} className="h-[52px] border-0 para bg-acc text-on-acc cursor-pointer font-d font-bold text-[15px] tracking-[0.05em] uppercase">
                     {t("Voir les résultats")}
                   </button>

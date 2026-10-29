@@ -46,7 +46,7 @@ export interface MayhemState {
 
 /** Tournoi solo : mon équipe en poule A, contre 15 bots qui ont drafté avec les mêmes règles. */
 export function soloTournament(s: MayhemState): MayhemTournament {
-  const me = { kind: "me" as const, picks: s.picks, rating: mayhemRating(s.picks).rating, crest: s.crest ?? undefined };
+  const me = { kind: "me" as const, picks: s.picks, rating: mayhemRating(s.picks, s.crest?.id).rating, crest: s.crest ?? undefined };
   return simulateTournament(s.seed, [me, ...botFill(s.seed, MAYHEM_ENTRANTS - 1, s.crest ? [s.crest.id] : [])]);
 }
 
@@ -71,7 +71,7 @@ export const mayhem: GameEngine<MayhemState> = {
       tournament: s.tournament,
       me: s.me,
       watched: s.watched ?? 0,
-      rating: mayhemRating(s.picks),
+      rating: mayhemRating(s.picks, s.crest?.id),
       over: this.isOver(s, now)
     };
   },
@@ -138,7 +138,7 @@ export const mayhem: GameEngine<MayhemState> = {
   result(s, now) {
     return {
       game: "mayhem",
-      rating: mayhemRating(s.picks).rating,
+      rating: mayhemRating(s.picks, s.crest?.id).rating,
       wins: s.tournament ? mayhemWins(s.tournament, s.me) : 0,
       durationMs: (s.endedAt ?? now) - s.startedAt
     };
@@ -147,6 +147,6 @@ export const mayhem: GameEngine<MayhemState> = {
     return { tournament: s.tournament };
   },
   progress(s) {
-    return { step: Object.keys(s.picks).length, score: mayhemRating(s.picks).rating };
+    return { step: Object.keys(s.picks).length, score: mayhemRating(s.picks, s.crest?.id).rating };
   }
 };

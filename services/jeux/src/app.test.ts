@@ -216,16 +216,18 @@ describe("World Mayhem", () => {
     expect(b.public.picks.top).toBeTruthy();
   });
 
-  test("équipe du jour : meilleur score (note + 2 par victoire)", async () => {
+  test("équipe du jour : meilleure note d'équipe, tournoi gagné ou perdu", async () => {
     const { post, call } = setup({ owned: { u1: ["game:mayhem"] } });
     const a = (await post("/rounds", "u1", { game: "mayhem", context: "classique" })).body;
     await draftAll(post, "u1", a.id);
     await post(`/rounds/${a.id}/act`, "u1", { type: "lock" });
+    // Dès l'équipe validée, avant même la fin du tournoi
+    expect((await call("/mayhem/day", "u1")).body.total).toBe(1);
     const end = (await post(`/rounds/${a.id}/act`, "u1", { type: "done" })).body.state;
     expect(end.over).toBe(true);
     const day = (await call("/mayhem/day", "u1")).body;
     expect(day.total).toBe(1);
-    expect(day.best.score).toBe(day.best.rating + 2 * day.best.wins);
+    expect(day.best.score).toBe(day.best.rating);
     expect(day.best.team.map((p: any) => p.role)).toEqual(["top", "jgl", "mid", "adc", "sup"]);
   });
 });

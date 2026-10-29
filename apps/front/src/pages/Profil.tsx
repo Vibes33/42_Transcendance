@@ -76,12 +76,16 @@ export function Profil() {
     if (!gliding.current && selKey) centerKey(selKey);
   }, [selKey]);
   const letterRefs = useRef(new Map<string, HTMLButtonElement>());
-  // La barre de lettres suit la sélection du carrousel (lettre courante centrée).
+  const lettersRef = useRef<HTMLElement>(null);
+  // La barre de lettres suit la sélection du carrousel (lettre courante centrée). Seule la barre
+  // défile, et seulement si elle déborde : scrollIntoView faisait aussi bouger la page (sautillement).
   useEffect(() => {
+    const bar = lettersRef.current;
     const el = letterRefs.current.get(roster[cIdx ?? home]?.letter ?? "");
-    if (!el) return;
+    if (!bar || !el || bar.scrollWidth <= bar.clientWidth) return;
+    const left = el.offsetLeft - bar.offsetLeft - (bar.clientWidth - el.offsetWidth) / 2;
     const reduced = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    el.scrollIntoView({ inline: "center", block: "nearest", behavior: reduced ? "auto" : "smooth" });
+    bar.scrollTo({ left, behavior: reduced ? "auto" : "smooth" });
   }, [cIdx, home, roster]);
   // Une lettre tapée n'importe où sur la page saute au champion correspondant
   // (sauf en saisie ou vitrine ouverte, qui gardent leurs propres touches).
@@ -326,7 +330,7 @@ export function Profil() {
           </ArrowBtn>
           <div
             ref={stripRef}
-            className="kb flex min-w-0 flex-1 items-center gap-3 box-border overflow-x-auto scroll"
+            className="kb flex min-w-0 flex-1 items-center gap-3 box-border min-h-[156px] overflow-x-auto scroll"
             tabIndex={0}
             role="group"
             aria-label={t("Carrousel des chibis. Tape une lettre pour aller au premier champion qui commence par elle, flèches pour naviguer, Entrée pour ouvrir la vitrine des skins.")}
@@ -394,7 +398,7 @@ export function Profil() {
             <TriRight size={18} />
           </ArrowBtn>
         </div>
-        <nav aria-label={t("Aller aux champions par lettre")} className="flex flex-nowrap items-center justify-start w-fit max-w-full mx-auto gap-0.5 overflow-x-auto scroll">
+        <nav ref={lettersRef} aria-label={t("Aller aux champions par lettre")} className="flex flex-nowrap items-center justify-start w-fit max-w-full mx-auto gap-0.5 overflow-x-auto scroll">
           {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((L) => {
             const ok = present.has(L);
             const isCur = roster[cur].letter === L;

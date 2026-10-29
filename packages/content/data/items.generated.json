@@ -1,0 +1,2669 @@
+{
+ "version": "16.21.1",
+ "finals": [
+  "2065",
+  "2501",
+  "2502",
+  "2503",
+  "2504",
+  "2510",
+  "2512",
+  "2517",
+  "2520",
+  "2522",
+  "2523",
+  "2524",
+  "2525",
+  "3003",
+  "3004",
+  "3026",
+  "3031",
+  "3032",
+  "3033",
+  "3036",
+  "3046",
+  "3050",
+  "3053",
+  "3065",
+  "3068",
+  "3071",
+  "3072",
+  "3073",
+  "3074",
+  "3075",
+  "3078",
+  "3083",
+  "3084",
+  "3085",
+  "3087",
+  "3089",
+  "3091",
+  "3094",
+  "3095",
+  "3100",
+  "3102",
+  "3107",
+  "3109",
+  "3110",
+  "3115",
+  "3116",
+  "3118",
+  "3119",
+  "3124",
+  "3135",
+  "3137",
+  "3139",
+  "3142",
+  "3143",
+  "3146",
+  "3152",
+  "3153",
+  "3156",
+  "3157",
+  "3161",
+  "3165",
+  "3179",
+  "3181",
+  "3190",
+  "3222",
+  "3302",
+  "3504",
+  "3508",
+  "3742",
+  "3748",
+  "3814",
+  "4005",
+  "4401",
+  "4628",
+  "4629",
+  "4633",
+  "4645",
+  "4646",
+  "6333",
+  "6609",
+  "6610",
+  "6616",
+  "6617",
+  "6620",
+  "6621",
+  "6631",
+  "6653",
+  "6655",
+  "6657",
+  "6662",
+  "6664",
+  "6665",
+  "6672",
+  "6673",
+  "6675",
+  "6676",
+  "6692",
+  "6694",
+  "6695",
+  "6696",
+  "6697",
+  "6698",
+  "6699",
+  "8010",
+  "8020"
+ ],
+ "items": [
+  {
+   "id": "1001",
+   "names": {
+    "fr": "Bottes",
+    "en": "Boots"
+   },
+   "gold": 300,
+   "from": [],
+   "basic": true,
+   "image": "1001.png"
+  },
+  {
+   "id": "1004",
+   "names": {
+    "fr": "Charme féérique",
+    "en": "Faerie Charm"
+   },
+   "gold": 200,
+   "from": [],
+   "basic": true,
+   "image": "1004.png"
+  },
+  {
+   "id": "1006",
+   "names": {
+    "fr": "Collier rafraîchissant",
+    "en": "Rejuvenation Bead"
+   },
+   "gold": 300,
+   "from": [],
+   "basic": true,
+   "image": "1006.png"
+  },
+  {
+   "id": "1011",
+   "names": {
+    "fr": "Ceinture du géant",
+    "en": "Giant's Belt"
+   },
+   "gold": 900,
+   "from": [
+    "1028"
+   ],
+   "basic": false,
+   "image": "1011.png"
+  },
+  {
+   "id": "1018",
+   "names": {
+    "fr": "Cape d'agilité",
+    "en": "Cloak of Agility"
+   },
+   "gold": 600,
+   "from": [],
+   "basic": true,
+   "image": "1018.png"
+  },
+  {
+   "id": "1026",
+   "names": {
+    "fr": "Baguette explosive",
+    "en": "Blasting Wand"
+   },
+   "gold": 850,
+   "from": [],
+   "basic": true,
+   "image": "1026.png"
+  },
+  {
+   "id": "1027",
+   "names": {
+    "fr": "Cristal de saphir",
+    "en": "Sapphire Crystal"
+   },
+   "gold": 300,
+   "from": [],
+   "basic": true,
+   "image": "1027.png"
+  },
+  {
+   "id": "1028",
+   "names": {
+    "fr": "Cristal de rubis",
+    "en": "Ruby Crystal"
+   },
+   "gold": 400,
+   "from": [],
+   "basic": true,
+   "image": "1028.png"
+  },
+  {
+   "id": "1029",
+   "names": {
+    "fr": "Armure d'étoffe",
+    "en": "Cloth Armor"
+   },
+   "gold": 300,
+   "from": [],
+   "basic": true,
+   "image": "1029.png"
+  },
+  {
+   "id": "1031",
+   "names": {
+    "fr": "Cotte de mailles",
+    "en": "Chain Vest"
+   },
+   "gold": 800,
+   "from": [
+    "1029"
+   ],
+   "basic": false,
+   "image": "1031.png"
+  },
+  {
+   "id": "1033",
+   "names": {
+    "fr": "Cape de néant",
+    "en": "Null-Magic Mantle"
+   },
+   "gold": 400,
+   "from": [],
+   "basic": true,
+   "image": "1033.png"
+  },
+  {
+   "id": "1036",
+   "names": {
+    "fr": "Épée longue",
+    "en": "Long Sword"
+   },
+   "gold": 350,
+   "from": [],
+   "basic": true,
+   "image": "1036.png"
+  },
+  {
+   "id": "1037",
+   "names": {
+    "fr": "Pioche",
+    "en": "Pickaxe"
+   },
+   "gold": 875,
+   "from": [],
+   "basic": true,
+   "image": "1037.png"
+  },
+  {
+   "id": "1038",
+   "names": {
+    "fr": "BF Glaive",
+    "en": "B. F. Sword"
+   },
+   "gold": 1300,
+   "from": [],
+   "basic": true,
+   "image": "1038.png"
+  },
+  {
+   "id": "1042",
+   "names": {
+    "fr": "Dague",
+    "en": "Dagger"
+   },
+   "gold": 250,
+   "from": [],
+   "basic": true,
+   "image": "1042.png"
+  },
+  {
+   "id": "1043",
+   "names": {
+    "fr": "Arc courbe",
+    "en": "Recurve Bow"
+   },
+   "gold": 700,
+   "from": [
+    "1042"
+   ],
+   "basic": false,
+   "image": "1043.png"
+  },
+  {
+   "id": "1052",
+   "names": {
+    "fr": "Tome d'amplification",
+    "en": "Amplifying Tome"
+   },
+   "gold": 400,
+   "from": [],
+   "basic": true,
+   "image": "1052.png"
+  },
+  {
+   "id": "1053",
+   "names": {
+    "fr": "Sceptre vampirique",
+    "en": "Vampiric Scepter"
+   },
+   "gold": 900,
+   "from": [
+    "1036"
+   ],
+   "basic": false,
+   "image": "1053.png"
+  },
+  {
+   "id": "1054",
+   "names": {
+    "fr": "Bouclier de Doran",
+    "en": "Doran's Shield"
+   },
+   "gold": 450,
+   "from": [],
+   "basic": true,
+   "image": "1054.png"
+  },
+  {
+   "id": "1055",
+   "names": {
+    "fr": "Lame de Doran",
+    "en": "Doran's Blade"
+   },
+   "gold": 450,
+   "from": [],
+   "basic": true,
+   "image": "1055.png"
+  },
+  {
+   "id": "1056",
+   "names": {
+    "fr": "Anneau de Doran",
+    "en": "Doran's Ring"
+   },
+   "gold": 400,
+   "from": [],
+   "basic": true,
+   "image": "1056.png"
+  },
+  {
+   "id": "1057",
+   "names": {
+    "fr": "Manteau de Négatron",
+    "en": "Negatron Cloak"
+   },
+   "gold": 850,
+   "from": [
+    "1033"
+   ],
+   "basic": false,
+   "image": "1057.png"
+  },
+  {
+   "id": "1058",
+   "names": {
+    "fr": "Baguette trop grosse",
+    "en": "Needlessly Large Rod"
+   },
+   "gold": 1200,
+   "from": [],
+   "basic": true,
+   "image": "1058.png"
+  },
+  {
+   "id": "1082",
+   "names": {
+    "fr": "Sceau noir",
+    "en": "Dark Seal"
+   },
+   "gold": 350,
+   "from": [],
+   "basic": true,
+   "image": "1082.png"
+  },
+  {
+   "id": "1083",
+   "names": {
+    "fr": "Abatteur",
+    "en": "Cull"
+   },
+   "gold": 450,
+   "from": [],
+   "basic": true,
+   "image": "1083.png"
+  },
+  {
+   "id": "1086",
+   "names": {
+    "fr": "Arc de Doran",
+    "en": "Doran's Bow"
+   },
+   "gold": 400,
+   "from": [],
+   "basic": true,
+   "image": "1086.png"
+  },
+  {
+   "id": "1101",
+   "names": {
+    "fr": "Bébé Chardent",
+    "en": "Scorchclaw Pup"
+   },
+   "gold": 450,
+   "from": [],
+   "basic": true,
+   "image": "1101.png"
+  },
+  {
+   "id": "1102",
+   "names": {
+    "fr": "Bébé Saute-nuages",
+    "en": "Gustwalker Hatchling"
+   },
+   "gold": 450,
+   "from": [],
+   "basic": true,
+   "image": "1102.png"
+  },
+  {
+   "id": "1103",
+   "names": {
+    "fr": "Bébé Ixamandre",
+    "en": "Mosstomper Seedling"
+   },
+   "gold": 450,
+   "from": [],
+   "basic": true,
+   "image": "1103.png"
+  },
+  {
+   "id": "1105",
+   "names": {
+    "fr": "Bébé Ixamandre",
+    "en": "Mosstomper Seedling"
+   },
+   "gold": 450,
+   "from": [],
+   "basic": true,
+   "image": "1105.png"
+  },
+  {
+   "id": "1106",
+   "names": {
+    "fr": "Bébé Saute-nuages",
+    "en": "Gustwalker Hatchling"
+   },
+   "gold": 450,
+   "from": [],
+   "basic": true,
+   "image": "1106.png"
+  },
+  {
+   "id": "1107",
+   "names": {
+    "fr": "Bébé Chardent",
+    "en": "Scorchclaw Pup"
+   },
+   "gold": 450,
+   "from": [],
+   "basic": true,
+   "image": "1107.png"
+  },
+  {
+   "id": "1120",
+   "names": {
+    "fr": "Casque de Doran",
+    "en": "Doran's Helm"
+   },
+   "gold": 450,
+   "from": [],
+   "basic": true,
+   "image": "1120.png"
+  },
+  {
+   "id": "2019",
+   "names": {
+    "fr": "Sceau d'acier",
+    "en": "Steel Sigil"
+   },
+   "gold": 1100,
+   "from": [
+    "1029",
+    "1036",
+    "1029"
+   ],
+   "basic": false,
+   "image": "2019.png"
+  },
+  {
+   "id": "2020",
+   "names": {
+    "fr": "Brutaliseur",
+    "en": "The Brutalizer"
+   },
+   "gold": 1337,
+   "from": [
+    "2022",
+    "1037"
+   ],
+   "basic": false,
+   "image": "2020.png"
+  },
+  {
+   "id": "2021",
+   "names": {
+    "fr": "Foreuse",
+    "en": "Tunneler"
+   },
+   "gold": 1150,
+   "from": [
+    "1036",
+    "1028"
+   ],
+   "basic": false,
+   "image": "2021.png"
+  },
+  {
+   "id": "2022",
+   "names": {
+    "fr": "Poussière luisante",
+    "en": "Glowing Mote"
+   },
+   "gold": 250,
+   "from": [],
+   "basic": true,
+   "image": "2022.png"
+  },
+  {
+   "id": "2051",
+   "names": {
+    "fr": "Corne du gardien",
+    "en": "Guardian's Horn"
+   },
+   "gold": 950,
+   "from": [],
+   "basic": true,
+   "image": "2051.png"
+  },
+  {
+   "id": "2065",
+   "names": {
+    "fr": "Chant de guerre de Shurelya",
+    "en": "Shurelya's Battlesong"
+   },
+   "gold": 2200,
+   "from": [
+    "3113",
+    "4642"
+   ],
+   "basic": false,
+   "image": "2065.png"
+  },
+  {
+   "id": "2138",
+   "names": {
+    "fr": "Élixir de fer",
+    "en": "Elixir of Iron"
+   },
+   "gold": 500,
+   "from": [],
+   "basic": true,
+   "image": "2138.png"
+  },
+  {
+   "id": "2139",
+   "names": {
+    "fr": "Élixir de sorcellerie",
+    "en": "Elixir of Sorcery"
+   },
+   "gold": 500,
+   "from": [],
+   "basic": true,
+   "image": "2139.png"
+  },
+  {
+   "id": "2140",
+   "names": {
+    "fr": "Élixir de rage",
+    "en": "Elixir of Wrath"
+   },
+   "gold": 500,
+   "from": [],
+   "basic": true,
+   "image": "2140.png"
+  },
+  {
+   "id": "2141",
+   "names": {
+    "fr": "Jus chapi-chapo",
+    "en": "Cappa Juice"
+   },
+   "gold": 300,
+   "from": [],
+   "basic": true,
+   "image": "2141.png"
+  },
+  {
+   "id": "2420",
+   "names": {
+    "fr": "Protège-bras du savant",
+    "en": "Seeker's Armguard"
+   },
+   "gold": 1600,
+   "from": [
+    "1052",
+    "1029",
+    "1052"
+   ],
+   "basic": false,
+   "image": "2420.png"
+  },
+  {
+   "id": "2501",
+   "names": {
+    "fr": "Armure sanguine",
+    "en": "Overlord's Bloodmail"
+   },
+   "gold": 3300,
+   "from": [
+    "2021",
+    "2021"
+   ],
+   "basic": false,
+   "image": "2501.png"
+  },
+  {
+   "id": "2502",
+   "names": {
+    "fr": "Désespoir infini",
+    "en": "Unending Despair"
+   },
+   "gold": 2800,
+   "from": [
+    "1031",
+    "3067",
+    "1028"
+   ],
+   "basic": false,
+   "image": "2502.png"
+  },
+  {
+   "id": "2503",
+   "names": {
+    "fr": "Torche noire",
+    "en": "Blackfire Torch"
+   },
+   "gold": 2800,
+   "from": [
+    "3802",
+    "2508"
+   ],
+   "basic": false,
+   "image": "2503.png"
+  },
+  {
+   "id": "2504",
+   "names": {
+    "fr": "Rookern kaénique",
+    "en": "Kaenic Rookern"
+   },
+   "gold": 2900,
+   "from": [
+    "3211",
+    "1057"
+   ],
+   "basic": false,
+   "image": "2504.png"
+  },
+  {
+   "id": "2508",
+   "names": {
+    "fr": "Cendres fatidiques",
+    "en": "Fated Ashes"
+   },
+   "gold": 900,
+   "from": [
+    "1052"
+   ],
+   "basic": false,
+   "image": "2508.png"
+  },
+  {
+   "id": "2510",
+   "names": {
+    "fr": "Aube et crépuscule",
+    "en": "Dusk and Dawn"
+   },
+   "gold": 3100,
+   "from": [
+    "3057",
+    "1026",
+    "3067",
+    "1042"
+   ],
+   "basic": false,
+   "image": "2510.png"
+  },
+  {
+   "id": "2512",
+   "names": {
+    "fr": "Chasseur de monstres",
+    "en": "Fiendhunter Bolts"
+   },
+   "gold": 2650,
+   "from": [
+    "3086",
+    "3144"
+   ],
+   "basic": false,
+   "image": "2512.png"
+  },
+  {
+   "id": "2517",
+   "names": {
+    "fr": "Faim insatiable",
+    "en": "Endless Hunger"
+   },
+   "gold": 3100,
+   "from": [
+    "3133",
+    "1037",
+    "1036"
+   ],
+   "basic": false,
+   "image": "2517.png"
+  },
+  {
+   "id": "2520",
+   "names": {
+    "fr": "Briseur de bastion",
+    "en": "Bastionbreaker"
+   },
+   "gold": 3000,
+   "from": [
+    "2020",
+    "3134"
+   ],
+   "basic": false,
+   "image": "2520.png"
+  },
+  {
+   "id": "2522",
+   "names": {
+    "fr": "Actualisateur",
+    "en": "Actualizer"
+   },
+   "gold": 2800,
+   "from": [
+    "3802",
+    "1026"
+   ],
+   "basic": false,
+   "image": "2522.png"
+  },
+  {
+   "id": "2523",
+   "names": {
+    "fr": "Lunettes Hextech C44",
+    "en": "Hexoptics C44"
+   },
+   "gold": 2800,
+   "from": [
+    "1037",
+    "6670",
+    "1036"
+   ],
+   "basic": false,
+   "image": "2523.png"
+  },
+  {
+   "id": "2524",
+   "names": {
+    "fr": "Flûtes de Bandle",
+    "en": "Bandlepipes"
+   },
+   "gold": 2300,
+   "from": [
+    "3067",
+    "1029",
+    "1033"
+   ],
+   "basic": false,
+   "image": "2524.png"
+  },
+  {
+   "id": "2525",
+   "names": {
+    "fr": "Harnais protoplasmique",
+    "en": "Protoplasm Harness"
+   },
+   "gold": 2600,
+   "from": [
+    "3067",
+    "1011"
+   ],
+   "basic": false,
+   "image": "2525.png"
+  },
+  {
+   "id": "3003",
+   "names": {
+    "fr": "Bâton de l'archange",
+    "en": "Archangel's Staff"
+   },
+   "gold": 2900,
+   "from": [
+    "3070",
+    "3802",
+    "3108"
+   ],
+   "basic": false,
+   "image": "3003.png"
+  },
+  {
+   "id": "3004",
+   "names": {
+    "fr": "Manamune",
+    "en": "Manamune"
+   },
+   "gold": 2900,
+   "from": [
+    "3070",
+    "3133",
+    "1036"
+   ],
+   "basic": false,
+   "image": "3004.png"
+  },
+  {
+   "id": "3024",
+   "names": {
+    "fr": "Bouclier glacial",
+    "en": "Glacial Buckler"
+   },
+   "gold": 900,
+   "from": [
+    "1029",
+    "1027",
+    "2022"
+   ],
+   "basic": false,
+   "image": "3024.png"
+  },
+  {
+   "id": "3026",
+   "names": {
+    "fr": "Ange gardien",
+    "en": "Guardian Angel"
+   },
+   "gold": 3200,
+   "from": [
+    "2019",
+    "1038"
+   ],
+   "basic": false,
+   "image": "3026.png"
+  },
+  {
+   "id": "3031",
+   "names": {
+    "fr": "Lame d'infini",
+    "en": "Infinity Edge"
+   },
+   "gold": 3500,
+   "from": [
+    "1038",
+    "1037",
+    "1018"
+   ],
+   "basic": false,
+   "image": "3031.png"
+  },
+  {
+   "id": "3032",
+   "names": {
+    "fr": "Flèches des Yun Tal",
+    "en": "Yun Tal Wildarrows"
+   },
+   "gold": 3000,
+   "from": [
+    "1038",
+    "3144",
+    "1036"
+   ],
+   "basic": false,
+   "image": "3032.png"
+  },
+  {
+   "id": "3033",
+   "names": {
+    "fr": "Rappel mortel",
+    "en": "Mortal Reminder"
+   },
+   "gold": 3000,
+   "from": [
+    "3123",
+    "3035",
+    "1018"
+   ],
+   "basic": false,
+   "image": "3033.png"
+  },
+  {
+   "id": "3035",
+   "names": {
+    "fr": "Dernier souffle",
+    "en": "Last Whisper"
+   },
+   "gold": 1450,
+   "from": [
+    "1036",
+    "1036"
+   ],
+   "basic": false,
+   "image": "3035.png"
+  },
+  {
+   "id": "3036",
+   "names": {
+    "fr": "Salutations de Dominik",
+    "en": "Lord Dominik's Regards"
+   },
+   "gold": 3300,
+   "from": [
+    "3035",
+    "6670"
+   ],
+   "basic": false,
+   "image": "3036.png"
+  },
+  {
+   "id": "3044",
+   "names": {
+    "fr": "Phage",
+    "en": "Phage"
+   },
+   "gold": 1100,
+   "from": [
+    "1028",
+    "1036"
+   ],
+   "basic": false,
+   "image": "3044.png"
+  },
+  {
+   "id": "3046",
+   "names": {
+    "fr": "Danseur fantôme",
+    "en": "Phantom Dancer"
+   },
+   "gold": 2650,
+   "from": [
+    "1042",
+    "3086",
+    "1042"
+   ],
+   "basic": false,
+   "image": "3046.png"
+  },
+  {
+   "id": "3050",
+   "names": {
+    "fr": "Convergence de Zeke",
+    "en": "Zeke's Convergence"
+   },
+   "gold": 2200,
+   "from": [
+    "3067",
+    "1029",
+    "1033"
+   ],
+   "basic": false,
+   "image": "3050.png"
+  },
+  {
+   "id": "3051",
+   "names": {
+    "fr": "Hache d'Âtrinsèque",
+    "en": "Hearthbound Axe"
+   },
+   "gold": 1200,
+   "from": [
+    "1036",
+    "1042",
+    "1036"
+   ],
+   "basic": false,
+   "image": "3051.png"
+  },
+  {
+   "id": "3053",
+   "names": {
+    "fr": "Gage de Sterak",
+    "en": "Sterak's Gage"
+   },
+   "gold": 3200,
+   "from": [
+    "1037",
+    "2021",
+    "1028"
+   ],
+   "basic": false,
+   "image": "3053.png"
+  },
+  {
+   "id": "3057",
+   "names": {
+    "fr": "Brillance",
+    "en": "Sheen"
+   },
+   "gold": 900,
+   "from": [
+    "2022"
+   ],
+   "basic": false,
+   "image": "3057.png"
+  },
+  {
+   "id": "3065",
+   "names": {
+    "fr": "Visage spirituel",
+    "en": "Spirit Visage"
+   },
+   "gold": 2700,
+   "from": [
+    "3211",
+    "3067"
+   ],
+   "basic": false,
+   "image": "3065.png"
+  },
+  {
+   "id": "3066",
+   "names": {
+    "fr": "Plaque de lune ailée",
+    "en": "Winged Moonplate"
+   },
+   "gold": 800,
+   "from": [
+    "1028"
+   ],
+   "basic": false,
+   "image": "3066.png"
+  },
+  {
+   "id": "3067",
+   "names": {
+    "fr": "Gemme exaltante",
+    "en": "Kindlegem"
+   },
+   "gold": 800,
+   "from": [
+    "1028",
+    "2022"
+   ],
+   "basic": false,
+   "image": "3067.png"
+  },
+  {
+   "id": "3068",
+   "names": {
+    "fr": "Égide solaire",
+    "en": "Sunfire Aegis"
+   },
+   "gold": 2800,
+   "from": [
+    "6660",
+    "1031",
+    "1028"
+   ],
+   "basic": false,
+   "image": "3068.png"
+  },
+  {
+   "id": "3070",
+   "names": {
+    "fr": "Larme de la déesse",
+    "en": "Tear of the Goddess"
+   },
+   "gold": 400,
+   "from": [],
+   "basic": true,
+   "image": "3070.png"
+  },
+  {
+   "id": "3071",
+   "names": {
+    "fr": "Couperet noir",
+    "en": "Black Cleaver"
+   },
+   "gold": 3000,
+   "from": [
+    "3044",
+    "3067",
+    "1037"
+   ],
+   "basic": false,
+   "image": "3071.png"
+  },
+  {
+   "id": "3072",
+   "names": {
+    "fr": "Soif-de-sang",
+    "en": "Bloodthirster"
+   },
+   "gold": 3400,
+   "from": [
+    "1038",
+    "1037",
+    "1053"
+   ],
+   "basic": false,
+   "image": "3072.png"
+  },
+  {
+   "id": "3073",
+   "names": {
+    "fr": "Hexplaque expérimentale",
+    "en": "Experimental Hexplate"
+   },
+   "gold": 3000,
+   "from": [
+    "2021",
+    "1042",
+    "3044"
+   ],
+   "basic": false,
+   "image": "3073.png"
+  },
+  {
+   "id": "3074",
+   "names": {
+    "fr": "Hydre vorace",
+    "en": "Ravenous Hydra"
+   },
+   "gold": 3300,
+   "from": [
+    "3077",
+    "1053",
+    "3133"
+   ],
+   "basic": false,
+   "image": "3074.png"
+  },
+  {
+   "id": "3075",
+   "names": {
+    "fr": "Cotte épineuse",
+    "en": "Thornmail"
+   },
+   "gold": 2450,
+   "from": [
+    "3076",
+    "1031",
+    "1028"
+   ],
+   "basic": false,
+   "image": "3075.png"
+  },
+  {
+   "id": "3076",
+   "names": {
+    "fr": "Armure roncière",
+    "en": "Bramble Vest"
+   },
+   "gold": 800,
+   "from": [
+    "1029",
+    "1029"
+   ],
+   "basic": false,
+   "image": "3076.png"
+  },
+  {
+   "id": "3077",
+   "names": {
+    "fr": "Tiamat",
+    "en": "Tiamat"
+   },
+   "gold": 1200,
+   "from": [
+    "1036",
+    "1036"
+   ],
+   "basic": false,
+   "image": "3077.png"
+  },
+  {
+   "id": "3078",
+   "names": {
+    "fr": "Force de la trinité",
+    "en": "Trinity Force"
+   },
+   "gold": 3333,
+   "from": [
+    "3057",
+    "3044",
+    "3051"
+   ],
+   "basic": false,
+   "image": "3078.png"
+  },
+  {
+   "id": "3082",
+   "names": {
+    "fr": "Mailles du gardien",
+    "en": "Warden's Mail"
+   },
+   "gold": 1000,
+   "from": [
+    "1029",
+    "1029"
+   ],
+   "basic": false,
+   "image": "3082.png"
+  },
+  {
+   "id": "3083",
+   "names": {
+    "fr": "Armure de Warmog",
+    "en": "Warmog's Armor"
+   },
+   "gold": 3100,
+   "from": [
+    "1011",
+    "1011",
+    "3801"
+   ],
+   "basic": false,
+   "image": "3083.png"
+  },
+  {
+   "id": "3084",
+   "names": {
+    "fr": "Cœuracier",
+    "en": "Heartsteel"
+   },
+   "gold": 3000,
+   "from": [
+    "1011",
+    "3801",
+    "1011"
+   ],
+   "basic": false,
+   "image": "3084.png"
+  },
+  {
+   "id": "3085",
+   "names": {
+    "fr": "Ouragan de Runaan",
+    "en": "Runaan's Hurricane"
+   },
+   "gold": 2650,
+   "from": [
+    "3086",
+    "3144"
+   ],
+   "basic": false,
+   "image": "3085.png"
+  },
+  {
+   "id": "3086",
+   "names": {
+    "fr": "Zèle",
+    "en": "Zeal"
+   },
+   "gold": 1200,
+   "from": [
+    "1018",
+    "1042"
+   ],
+   "basic": false,
+   "image": "3086.png"
+  },
+  {
+   "id": "3087",
+   "names": {
+    "fr": "Poignard de Statikk",
+    "en": "Statikk Shiv"
+   },
+   "gold": 3000,
+   "from": [
+    "3144",
+    "3113",
+    "1037"
+   ],
+   "basic": false,
+   "image": "3087.png"
+  },
+  {
+   "id": "3089",
+   "names": {
+    "fr": "Coiffe de Rabadon",
+    "en": "Rabadon's Deathcap"
+   },
+   "gold": 3500,
+   "from": [
+    "1058",
+    "1058"
+   ],
+   "basic": false,
+   "image": "3089.png"
+  },
+  {
+   "id": "3091",
+   "names": {
+    "fr": "Au bout du rouleau",
+    "en": "Wit's End"
+   },
+   "gold": 2800,
+   "from": [
+    "1043",
+    "1057",
+    "1043"
+   ],
+   "basic": false,
+   "image": "3091.png"
+  },
+  {
+   "id": "3094",
+   "names": {
+    "fr": "Canon ultrarapide",
+    "en": "Rapid Firecannon"
+   },
+   "gold": 2650,
+   "from": [
+    "3086",
+    "3144"
+   ],
+   "basic": false,
+   "image": "3094.png"
+  },
+  {
+   "id": "3095",
+   "names": {
+    "fr": "Lame tempête",
+    "en": "Stormrazor"
+   },
+   "gold": 3200,
+   "from": [
+    "1038",
+    "1018",
+    "3144"
+   ],
+   "basic": false,
+   "image": "3095.png"
+  },
+  {
+   "id": "3100",
+   "names": {
+    "fr": "Fléau de liche",
+    "en": "Lich Bane"
+   },
+   "gold": 2900,
+   "from": [
+    "3057",
+    "3113",
+    "1026"
+   ],
+   "basic": false,
+   "image": "3100.png"
+  },
+  {
+   "id": "3102",
+   "names": {
+    "fr": "Voile de la banshee",
+    "en": "Banshee's Veil"
+   },
+   "gold": 3000,
+   "from": [
+    "1058",
+    "4632"
+   ],
+   "basic": false,
+   "image": "3102.png"
+  },
+  {
+   "id": "3107",
+   "names": {
+    "fr": "Rédemption",
+    "en": "Redemption"
+   },
+   "gold": 2300,
+   "from": [
+    "3108",
+    "3114"
+   ],
+   "basic": false,
+   "image": "3107.png"
+  },
+  {
+   "id": "3108",
+   "names": {
+    "fr": "Codex méphitique",
+    "en": "Fiendish Codex"
+   },
+   "gold": 850,
+   "from": [
+    "1052",
+    "2022"
+   ],
+   "basic": false,
+   "image": "3108.png"
+  },
+  {
+   "id": "3109",
+   "names": {
+    "fr": "Vœu du chevalier",
+    "en": "Knight's Vow"
+   },
+   "gold": 2300,
+   "from": [
+    "3067",
+    "1031",
+    "1006"
+   ],
+   "basic": false,
+   "image": "3109.png"
+  },
+  {
+   "id": "3110",
+   "names": {
+    "fr": "Cœur gelé",
+    "en": "Frozen Heart"
+   },
+   "gold": 2500,
+   "from": [
+    "3082",
+    "3024"
+   ],
+   "basic": false,
+   "image": "3110.png"
+  },
+  {
+   "id": "3112",
+   "names": {
+    "fr": "Orbe du gardien",
+    "en": "Guardian's Orb"
+   },
+   "gold": 950,
+   "from": [],
+   "basic": true,
+   "image": "3112.png"
+  },
+  {
+   "id": "3113",
+   "names": {
+    "fr": "Feu follet éthéré",
+    "en": "Aether Wisp"
+   },
+   "gold": 900,
+   "from": [
+    "1052"
+   ],
+   "basic": false,
+   "image": "3113.png"
+  },
+  {
+   "id": "3114",
+   "names": {
+    "fr": "Idole interdite",
+    "en": "Forbidden Idol"
+   },
+   "gold": 600,
+   "from": [
+    "1004"
+   ],
+   "basic": false,
+   "image": "3114.png"
+  },
+  {
+   "id": "3115",
+   "names": {
+    "fr": "Dent de Nashor",
+    "en": "Nashor's Tooth"
+   },
+   "gold": 2900,
+   "from": [
+    "1043",
+    "1026",
+    "3108"
+   ],
+   "basic": false,
+   "image": "3115.png"
+  },
+  {
+   "id": "3116",
+   "names": {
+    "fr": "Sceptre de Rylai",
+    "en": "Rylai's Crystal Scepter"
+   },
+   "gold": 2600,
+   "from": [
+    "1026",
+    "1011",
+    "1052"
+   ],
+   "basic": false,
+   "image": "3116.png"
+  },
+  {
+   "id": "3118",
+   "names": {
+    "fr": "Malfaisance",
+    "en": "Malignance"
+   },
+   "gold": 2700,
+   "from": [
+    "3802",
+    "1026"
+   ],
+   "basic": false,
+   "image": "3118.png"
+  },
+  {
+   "id": "3119",
+   "names": {
+    "fr": "Approche de l'hiver",
+    "en": "Winter's Approach"
+   },
+   "gold": 2400,
+   "from": [
+    "3070",
+    "1011",
+    "3067"
+   ],
+   "basic": false,
+   "image": "3119.png"
+  },
+  {
+   "id": "3123",
+   "names": {
+    "fr": "Marque du bourreau",
+    "en": "Executioner's Calling"
+   },
+   "gold": 800,
+   "from": [
+    "1036"
+   ],
+   "basic": false,
+   "image": "3123.png"
+  },
+  {
+   "id": "3124",
+   "names": {
+    "fr": "Lame enragée de Guinsoo",
+    "en": "Guinsoo's Rageblade"
+   },
+   "gold": 3000,
+   "from": [
+    "1052",
+    "1043",
+    "1037"
+   ],
+   "basic": false,
+   "image": "3124.png"
+  },
+  {
+   "id": "3133",
+   "names": {
+    "fr": "Marteau de Caulfield",
+    "en": "Caulfield's Warhammer"
+   },
+   "gold": 1050,
+   "from": [
+    "1036",
+    "2022",
+    "1036"
+   ],
+   "basic": false,
+   "image": "3133.png"
+  },
+  {
+   "id": "3134",
+   "names": {
+    "fr": "Dague dentelée",
+    "en": "Serrated Dirk"
+   },
+   "gold": 1000,
+   "from": [
+    "1036",
+    "1036"
+   ],
+   "basic": false,
+   "image": "3134.png"
+  },
+  {
+   "id": "3135",
+   "names": {
+    "fr": "Bâton du vide",
+    "en": "Void Staff"
+   },
+   "gold": 3000,
+   "from": [
+    "4630",
+    "1026"
+   ],
+   "basic": false,
+   "image": "3135.png"
+  },
+  {
+   "id": "3137",
+   "names": {
+    "fr": "Fleur de crypte",
+    "en": "Cryptbloom"
+   },
+   "gold": 3000,
+   "from": [
+    "4630",
+    "3108",
+    "3108"
+   ],
+   "basic": false,
+   "image": "3137.png"
+  },
+  {
+   "id": "3139",
+   "names": {
+    "fr": "Cimeterre mercuriel",
+    "en": "Mercurial Scimitar"
+   },
+   "gold": 3200,
+   "from": [
+    "3140",
+    "1037",
+    "1053"
+   ],
+   "basic": false,
+   "image": "3139.png"
+  },
+  {
+   "id": "3140",
+   "names": {
+    "fr": "Ceinture de mercure",
+    "en": "Quicksilver Sash"
+   },
+   "gold": 1300,
+   "from": [
+    "1033"
+   ],
+   "basic": false,
+   "image": "3140.png"
+  },
+  {
+   "id": "3142",
+   "names": {
+    "fr": "Lame spectre de Youmuu",
+    "en": "Youmuu's Ghostblade"
+   },
+   "gold": 2800,
+   "from": [
+    "3134",
+    "6690",
+    "1036"
+   ],
+   "basic": false,
+   "image": "3142.png"
+  },
+  {
+   "id": "3143",
+   "names": {
+    "fr": "Présage de Randuin",
+    "en": "Randuin's Omen"
+   },
+   "gold": 2700,
+   "from": [
+    "3082",
+    "1011"
+   ],
+   "basic": false,
+   "image": "3143.png"
+  },
+  {
+   "id": "3144",
+   "names": {
+    "fr": "Fronde de l'éclaireur",
+    "en": "Scout's Slingshot"
+   },
+   "gold": 600,
+   "from": [
+    "1042",
+    "1042"
+   ],
+   "basic": false,
+   "image": "3144.png"
+  },
+  {
+   "id": "3145",
+   "names": {
+    "fr": "Alternateur Hextech",
+    "en": "Hextech Alternator"
+   },
+   "gold": 1100,
+   "from": [
+    "1052",
+    "1052"
+   ],
+   "basic": false,
+   "image": "3145.png"
+  },
+  {
+   "id": "3146",
+   "names": {
+    "fr": "Pistolame Hextech",
+    "en": "Hextech Gunblade"
+   },
+   "gold": 3000,
+   "from": [
+    "1053",
+    "3145",
+    "1052"
+   ],
+   "basic": false,
+   "image": "3146.png"
+  },
+  {
+   "id": "3147",
+   "names": {
+    "fr": "Déguisement hanté",
+    "en": "Haunting Guise"
+   },
+   "gold": 1300,
+   "from": [
+    "1052",
+    "1028"
+   ],
+   "basic": false,
+   "image": "3147.png"
+  },
+  {
+   "id": "3152",
+   "names": {
+    "fr": "Ceinture-roquette Hextech",
+    "en": "Hextech Rocketbelt"
+   },
+   "gold": 2650,
+   "from": [
+    "3145",
+    "3067",
+    "1028"
+   ],
+   "basic": false,
+   "image": "3152.png"
+  },
+  {
+   "id": "3153",
+   "names": {
+    "fr": "Lame du roi déchu",
+    "en": "Blade of The Ruined King"
+   },
+   "gold": 3200,
+   "from": [
+    "1053",
+    "1043",
+    "1037"
+   ],
+   "basic": false,
+   "image": "3153.png"
+  },
+  {
+   "id": "3155",
+   "names": {
+    "fr": "Hexterminateur",
+    "en": "Hexdrinker"
+   },
+   "gold": 1300,
+   "from": [
+    "1036",
+    "1033",
+    "1036"
+   ],
+   "basic": false,
+   "image": "3155.png"
+  },
+  {
+   "id": "3156",
+   "names": {
+    "fr": "Gueule de Malmortius",
+    "en": "Maw of Malmortius"
+   },
+   "gold": 3100,
+   "from": [
+    "3155",
+    "3133"
+   ],
+   "basic": false,
+   "image": "3156.png"
+  },
+  {
+   "id": "3157",
+   "names": {
+    "fr": "Sablier de Zhonya",
+    "en": "Zhonya's Hourglass"
+   },
+   "gold": 3250,
+   "from": [
+    "1058",
+    "2420"
+   ],
+   "basic": false,
+   "image": "3157.png"
+  },
+  {
+   "id": "3161",
+   "names": {
+    "fr": "Lance de Shojin",
+    "en": "Spear of Shojin"
+   },
+   "gold": 3100,
+   "from": [
+    "1037",
+    "2021",
+    "1028"
+   ],
+   "basic": false,
+   "image": "3161.png"
+  },
+  {
+   "id": "3165",
+   "names": {
+    "fr": "Morellonomicon",
+    "en": "Morellonomicon"
+   },
+   "gold": 2850,
+   "from": [
+    "3916",
+    "1026",
+    "3067"
+   ],
+   "basic": false,
+   "image": "3165.png"
+  },
+  {
+   "id": "3177",
+   "names": {
+    "fr": "Lame du gardien",
+    "en": "Guardian's Blade"
+   },
+   "gold": 950,
+   "from": [],
+   "basic": true,
+   "image": "3177.png"
+  },
+  {
+   "id": "3179",
+   "names": {
+    "fr": "Glaive d'ombre",
+    "en": "Umbral Glaive"
+   },
+   "gold": 2800,
+   "from": [
+    "3134",
+    "3133"
+   ],
+   "basic": false,
+   "image": "3179.png"
+  },
+  {
+   "id": "3181",
+   "names": {
+    "fr": "Brise-coques",
+    "en": "Hullbreaker"
+   },
+   "gold": 3000,
+   "from": [
+    "2021",
+    "3066",
+    "1037"
+   ],
+   "basic": false,
+   "image": "3181.png"
+  },
+  {
+   "id": "3184",
+   "names": {
+    "fr": "Marteau du gardien",
+    "en": "Guardian's Hammer"
+   },
+   "gold": 950,
+   "from": [],
+   "basic": true,
+   "image": "3184.png"
+  },
+  {
+   "id": "3190",
+   "names": {
+    "fr": "Médaillon de l'Iron Solari",
+    "en": "Locket of the Iron Solari"
+   },
+   "gold": 2200,
+   "from": [
+    "3067",
+    "1029",
+    "1033"
+   ],
+   "basic": false,
+   "image": "3190.png"
+  },
+  {
+   "id": "3211",
+   "names": {
+    "fr": "Manteau de spectre",
+    "en": "Spectre's Cowl"
+   },
+   "gold": 1250,
+   "from": [
+    "1028",
+    "1033",
+    "1006"
+   ],
+   "basic": false,
+   "image": "3211.png"
+  },
+  {
+   "id": "3222",
+   "names": {
+    "fr": "Bénédiction de Mikael",
+    "en": "Mikael's Blessing"
+   },
+   "gold": 2300,
+   "from": [
+    "3067",
+    "3114"
+   ],
+   "basic": false,
+   "image": "3222.png"
+  },
+  {
+   "id": "3302",
+   "names": {
+    "fr": "Terminus",
+    "en": "Terminus"
+   },
+   "gold": 3000,
+   "from": [
+    "3051",
+    "1043"
+   ],
+   "basic": false,
+   "image": "3302.png"
+  },
+  {
+   "id": "3504",
+   "names": {
+    "fr": "Encensoir ardent",
+    "en": "Ardent Censer"
+   },
+   "gold": 2200,
+   "from": [
+    "3113",
+    "3114"
+   ],
+   "basic": false,
+   "image": "3504.png"
+  },
+  {
+   "id": "3508",
+   "names": {
+    "fr": "Faux spectrale",
+    "en": "Essence Reaver"
+   },
+   "gold": 3050,
+   "from": [
+    "3057",
+    "3133",
+    "1018"
+   ],
+   "basic": false,
+   "image": "3508.png"
+  },
+  {
+   "id": "3742",
+   "names": {
+    "fr": "Plaque du mort",
+    "en": "Dead Man's Plate"
+   },
+   "gold": 2900,
+   "from": [
+    "3066",
+    "1028",
+    "1031"
+   ],
+   "basic": false,
+   "image": "3742.png"
+  },
+  {
+   "id": "3748",
+   "names": {
+    "fr": "Hydre titanesque",
+    "en": "Titanic Hydra"
+   },
+   "gold": 3300,
+   "from": [
+    "3077",
+    "2021",
+    "1011"
+   ],
+   "basic": false,
+   "image": "3748.png"
+  },
+  {
+   "id": "3801",
+   "names": {
+    "fr": "Bracelet cristallin",
+    "en": "Crystalline Bracer"
+   },
+   "gold": 800,
+   "from": [
+    "1028",
+    "1006"
+   ],
+   "basic": false,
+   "image": "3801.png"
+  },
+  {
+   "id": "3802",
+   "names": {
+    "fr": "Chapitre perdu",
+    "en": "Lost Chapter"
+   },
+   "gold": 1200,
+   "from": [
+    "1052",
+    "1027",
+    "2022"
+   ],
+   "basic": false,
+   "image": "3802.png"
+  },
+  {
+   "id": "3803",
+   "names": {
+    "fr": "Catalyseur de l'éternité",
+    "en": "Catalyst of Aeons"
+   },
+   "gold": 1300,
+   "from": [
+    "1028",
+    "1028",
+    "1027"
+   ],
+   "basic": false,
+   "image": "3803.png"
+  },
+  {
+   "id": "3814",
+   "names": {
+    "fr": "Manteau de la nuit",
+    "en": "Edge of Night"
+   },
+   "gold": 3000,
+   "from": [
+    "3134",
+    "2021"
+   ],
+   "basic": false,
+   "image": "3814.png"
+  },
+  {
+   "id": "3865",
+   "names": {
+    "fr": "Atlas",
+    "en": "World Atlas"
+   },
+   "gold": 400,
+   "from": [],
+   "basic": true,
+   "image": "3865.png"
+  },
+  {
+   "id": "3916",
+   "names": {
+    "fr": "Orbe de l'oubli",
+    "en": "Oblivion Orb"
+   },
+   "gold": 800,
+   "from": [
+    "1052"
+   ],
+   "basic": false,
+   "image": "3916.png"
+  },
+  {
+   "id": "4005",
+   "names": {
+    "fr": "Mandat impérial",
+    "en": "Imperial Mandate"
+   },
+   "gold": 2400,
+   "from": [
+    "1052",
+    "4642",
+    "1052"
+   ],
+   "basic": false,
+   "image": "4005.png"
+  },
+  {
+   "id": "4401",
+   "names": {
+    "fr": "Force de la nature",
+    "en": "Force of Nature"
+   },
+   "gold": 2800,
+   "from": [
+    "1057",
+    "1028",
+    "3066"
+   ],
+   "basic": false,
+   "image": "4401.png"
+  },
+  {
+   "id": "4628",
+   "names": {
+    "fr": "Concentration lointaine",
+    "en": "Horizon Focus"
+   },
+   "gold": 2700,
+   "from": [
+    "3108",
+    "3108",
+    "1052"
+   ],
+   "basic": false,
+   "image": "4628.png"
+  },
+  {
+   "id": "4629",
+   "names": {
+    "fr": "Volonté cosmique",
+    "en": "Cosmic Drive"
+   },
+   "gold": 3000,
+   "from": [
+    "3067",
+    "3113",
+    "3108"
+   ],
+   "basic": false,
+   "image": "4629.png"
+  },
+  {
+   "id": "4630",
+   "names": {
+    "fr": "Joyau putréfiant",
+    "en": "Blighting Jewel"
+   },
+   "gold": 1100,
+   "from": [
+    "1052"
+   ],
+   "basic": false,
+   "image": "4630.png"
+  },
+  {
+   "id": "4632",
+   "names": {
+    "fr": "Barrière verdoyante",
+    "en": "Verdant Barrier"
+   },
+   "gold": 1600,
+   "from": [
+    "1052",
+    "1033",
+    "1052"
+   ],
+   "basic": false,
+   "image": "4632.png"
+  },
+  {
+   "id": "4633",
+   "names": {
+    "fr": "Créateur de failles",
+    "en": "Riftmaker"
+   },
+   "gold": 3100,
+   "from": [
+    "3147",
+    "3108"
+   ],
+   "basic": false,
+   "image": "4633.png"
+  },
+  {
+   "id": "4642",
+   "names": {
+    "fr": "Miroir en verre de Bandle",
+    "en": "Bandleglass Mirror"
+   },
+   "gold": 900,
+   "from": [
+    "1004",
+    "1052",
+    "2022"
+   ],
+   "basic": false,
+   "image": "4642.png"
+  },
+  {
+   "id": "4645",
+   "names": {
+    "fr": "Flamme-ombre",
+    "en": "Shadowflame"
+   },
+   "gold": 3200,
+   "from": [
+    "3145",
+    "1058"
+   ],
+   "basic": false,
+   "image": "4645.png"
+  },
+  {
+   "id": "4646",
+   "names": {
+    "fr": "Onde orageuse",
+    "en": "Stormsurge"
+   },
+   "gold": 2800,
+   "from": [
+    "3145",
+    "3113"
+   ],
+   "basic": false,
+   "image": "4646.png"
+  },
+  {
+   "id": "6333",
+   "names": {
+    "fr": "Danse de la mort",
+    "en": "Death's Dance"
+   },
+   "gold": 3300,
+   "from": [
+    "2019",
+    "1037",
+    "3133"
+   ],
+   "basic": false,
+   "image": "6333.png"
+  },
+  {
+   "id": "6609",
+   "names": {
+    "fr": "Épée dentelée chimico-punk",
+    "en": "Chempunk Chainsword"
+   },
+   "gold": 3000,
+   "from": [
+    "3123",
+    "1011",
+    "3133"
+   ],
+   "basic": false,
+   "image": "6609.png"
+  },
+  {
+   "id": "6610",
+   "names": {
+    "fr": "Ciel éventré",
+    "en": "Sundered Sky"
+   },
+   "gold": 3100,
+   "from": [
+    "2021",
+    "3133"
+   ],
+   "basic": false,
+   "image": "6610.png"
+  },
+  {
+   "id": "6616",
+   "names": {
+    "fr": "Bâton des flots",
+    "en": "Staff of Flowing Water"
+   },
+   "gold": 2250,
+   "from": [
+    "3108",
+    "3114"
+   ],
+   "basic": false,
+   "image": "6616.png"
+  },
+  {
+   "id": "6617",
+   "names": {
+    "fr": "Régénérateur de pierre de lune",
+    "en": "Moonstone Renewer"
+   },
+   "gold": 2200,
+   "from": [
+    "3067",
+    "4642"
+   ],
+   "basic": false,
+   "image": "6617.png"
+  },
+  {
+   "id": "6620",
+   "names": {
+    "fr": "Échos d'Helia",
+    "en": "Echoes of Helia"
+   },
+   "gold": 2200,
+   "from": [
+    "3067",
+    "4642"
+   ],
+   "basic": false,
+   "image": "6620.png"
+  },
+  {
+   "id": "6621",
+   "names": {
+    "fr": "Cœur de l'aube",
+    "en": "Dawncore"
+   },
+   "gold": 2500,
+   "from": [
+    "1026",
+    "3114",
+    "3114"
+   ],
+   "basic": false,
+   "image": "6621.png"
+  },
+  {
+   "id": "6631",
+   "names": {
+    "fr": "Estropieur",
+    "en": "Stridebreaker"
+   },
+   "gold": 3300,
+   "from": [
+    "3077",
+    "3044",
+    "1042"
+   ],
+   "basic": false,
+   "image": "6631.png"
+  },
+  {
+   "id": "6653",
+   "names": {
+    "fr": "Tourment de Liandry",
+    "en": "Liandry's Torment"
+   },
+   "gold": 3000,
+   "from": [
+    "3147",
+    "2508"
+   ],
+   "basic": false,
+   "image": "6653.png"
+  },
+  {
+   "id": "6655",
+   "names": {
+    "fr": "Écho de Luden",
+    "en": "Luden's Echo"
+   },
+   "gold": 2750,
+   "from": [
+    "3802",
+    "3145"
+   ],
+   "basic": false,
+   "image": "6655.png"
+  },
+  {
+   "id": "6657",
+   "names": {
+    "fr": "Bâton séculaire",
+    "en": "Rod of Ages"
+   },
+   "gold": 2600,
+   "from": [
+    "1026",
+    "3803"
+   ],
+   "basic": false,
+   "image": "6657.png"
+  },
+  {
+   "id": "6660",
+   "names": {
+    "fr": "Cendres de Bami",
+    "en": "Bami's Cinder"
+   },
+   "gold": 900,
+   "from": [
+    "1028",
+    "2022"
+   ],
+   "basic": false,
+   "image": "6660.png"
+  },
+  {
+   "id": "6662",
+   "names": {
+    "fr": "Gantelet givrant",
+    "en": "Iceborn Gauntlet"
+   },
+   "gold": 2900,
+   "from": [
+    "3057",
+    "1028",
+    "1031"
+   ],
+   "basic": false,
+   "image": "6662.png"
+  },
+  {
+   "id": "6664",
+   "names": {
+    "fr": "Rayonnement du vide",
+    "en": "Hollow Radiance"
+   },
+   "gold": 2800,
+   "from": [
+    "6660",
+    "3211"
+   ],
+   "basic": false,
+   "image": "6664.png"
+  },
+  {
+   "id": "6665",
+   "names": {
+    "fr": "Jak'Sho, le Protéiforme",
+    "en": "Jak'Sho, The Protean"
+   },
+   "gold": 3200,
+   "from": [
+    "1011",
+    "1031",
+    "1057"
+   ],
+   "basic": false,
+   "image": "6665.png"
+  },
+  {
+   "id": "6670",
+   "names": {
+    "fr": "Carquois zénithien",
+    "en": "Noonquiver"
+   },
+   "gold": 1300,
+   "from": [
+    "1036",
+    "1018"
+   ],
+   "basic": false,
+   "image": "6670.png"
+  },
+  {
+   "id": "6672",
+   "names": {
+    "fr": "Tueur de krakens",
+    "en": "Kraken Slayer"
+   },
+   "gold": 3000,
+   "from": [
+    "6690",
+    "3051",
+    "1043"
+   ],
+   "basic": false,
+   "image": "6672.png"
+  },
+  {
+   "id": "6673",
+   "names": {
+    "fr": "Arc-bouclier immortel",
+    "en": "Immortal Shieldbow"
+   },
+   "gold": 3000,
+   "from": [
+    "1037",
+    "6670"
+   ],
+   "basic": false,
+   "image": "6673.png"
+  },
+  {
+   "id": "6675",
+   "names": {
+    "fr": "Tremblelame navori",
+    "en": "Navori Flickerblade"
+   },
+   "gold": 2650,
+   "from": [
+    "1042",
+    "3086",
+    "1042"
+   ],
+   "basic": false,
+   "image": "6675.png"
+  },
+  {
+   "id": "6676",
+   "names": {
+    "fr": "Percepteur",
+    "en": "The Collector"
+   },
+   "gold": 3000,
+   "from": [
+    "1037",
+    "3134",
+    "1018"
+   ],
+   "basic": false,
+   "image": "6676.png"
+  },
+  {
+   "id": "6690",
+   "names": {
+    "fr": "Rectrix",
+    "en": "Rectrix"
+   },
+   "gold": 775,
+   "from": [
+    "1036"
+   ],
+   "basic": false,
+   "image": "6690.png"
+  },
+  {
+   "id": "6692",
+   "names": {
+    "fr": "Éclipse",
+    "en": "Eclipse"
+   },
+   "gold": 2900,
+   "from": [
+    "3133",
+    "1037",
+    "1036"
+   ],
+   "basic": false,
+   "image": "6692.png"
+  },
+  {
+   "id": "6694",
+   "names": {
+    "fr": "Rancune de Serylda",
+    "en": "Serylda's Grudge"
+   },
+   "gold": 3000,
+   "from": [
+    "3133",
+    "3035"
+   ],
+   "basic": false,
+   "image": "6694.png"
+  },
+  {
+   "id": "6695",
+   "names": {
+    "fr": "Crochet de serpent",
+    "en": "Serpent's Fang"
+   },
+   "gold": 2500,
+   "from": [
+    "3134",
+    "1037"
+   ],
+   "basic": false,
+   "image": "6695.png"
+  },
+  {
+   "id": "6696",
+   "names": {
+    "fr": "Arc axiomatique",
+    "en": "Axiom Arc"
+   },
+   "gold": 2750,
+   "from": [
+    "2020",
+    "3133"
+   ],
+   "basic": false,
+   "image": "6696.png"
+  },
+  {
+   "id": "6697",
+   "names": {
+    "fr": "Orgueil",
+    "en": "Hubris"
+   },
+   "gold": 2800,
+   "from": [
+    "3134",
+    "3133"
+   ],
+   "basic": false,
+   "image": "6697.png"
+  },
+  {
+   "id": "6698",
+   "names": {
+    "fr": "Hydre profane",
+    "en": "Profane Hydra"
+   },
+   "gold": 2850,
+   "from": [
+    "3077",
+    "2020"
+   ],
+   "basic": false,
+   "image": "6698.png"
+  },
+  {
+   "id": "6699",
+   "names": {
+    "fr": "Cyclosabre voltaïque",
+    "en": "Voltaic Cyclosword"
+   },
+   "gold": 3000,
+   "from": [
+    "2020",
+    "1036",
+    "1036"
+   ],
+   "basic": false,
+   "image": "6699.png"
+  },
+  {
+   "id": "8010",
+   "names": {
+    "fr": "Malédiction du sanguinaire",
+    "en": "Bloodletter's Curse"
+   },
+   "gold": 2900,
+   "from": [
+    "3147",
+    "3108"
+   ],
+   "basic": false,
+   "image": "8010.png"
+  },
+  {
+   "id": "8020",
+   "names": {
+    "fr": "Masque abyssal",
+    "en": "Abyssal Mask"
+   },
+   "gold": 2650,
+   "from": [
+    "3067",
+    "1057"
+   ],
+   "basic": false,
+   "image": "8020.png"
+  }
+ ]
+}

@@ -65,7 +65,7 @@ export function Partie() {
   const tutoForce = ctx === "classique" && !session && sp.get("tuto") === "1";
 
   // Tutoriel à la première partie en solo de chaque jeu (avant de lancer le chrono)
-  const needsTuto = !!game && !session && !!me.profile && ctx !== "streamer" && !me.profile.tutorials?.[game];
+  const needsTuto = !!game && GAME_UI[game].tutorial.length > 0 && !session && !!me.profile && ctx !== "streamer" && !me.profile.tutorials?.[game];
 
   useEffect(() => {
     if (needsTuto && !round) setTutorial(game);

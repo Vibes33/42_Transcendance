@@ -113,7 +113,7 @@ export function Mayhem() {
                 {t("Débloquer")} · <Shard size={20} /> {fmt(CLASSIC_UNLOCK_PRICE)}
               </button>
             )}
-            <span className="flex-[1_1_240px] text-[14.5px] leading-snug text-mut">{mode === "amis" ? t("Un membre du groupe qui a débloqué le jeu suffit.") : t("Sans points : ton score compte pour l’équipe du jour.")}</span>
+            <span className="flex-[1_1_240px] text-[14.5px] leading-snug text-mut">{mode === "amis" ? t("Un membre du groupe qui a débloqué le jeu suffit.") : t("Sans points : ta note d’équipe compte pour l’équipe du jour.")}</span>
           </div>
         </section>
 
@@ -130,7 +130,7 @@ export function Mayhem() {
                     {best.crest && <CrestLogo crest={best.crest} className="basis-14 shrink-0 w-14 h-14" />}
                     <div className="flex-auto min-w-0 flex flex-col">
                       <strong className="font-d text-[26px] leading-tight truncate">{best.crest?.name ?? best.player?.pseudo ?? "?"}</strong>
-                      <span className="text-sm text-mut truncate">{t("{player} · {w} victoire(s) · score {s}", { player: best.player?.pseudo ?? "?", w: best.wins, s: best.score })}</span>
+                      <span className="text-sm text-mut truncate">{t("{player} · {w} victoire(s)", { player: best.player?.pseudo ?? "?", w: best.wins })}</span>
                     </div>
                     <div className="flex flex-col items-end">
                       <span className="font-d font-bold text-5xl leading-none text-acc">{best.rating}</span>
@@ -158,7 +158,7 @@ export function Mayhem() {
               ) : (
                 <span className="text-[15px] leading-normal text-mut">{t("Personne n’a encore fini de tournoi aujourd’hui : la première équipe sera mise en avant ici.")}</span>
               )}
-              <span className="text-[13px] leading-normal text-mut">{t("Meilleur score du jour : note d’équipe + 2 points par victoire en tournoi.")}</span>
+              <span className="text-[13px] leading-normal text-mut">{t("La meilleure note d’équipe du jour, que le tournoi soit gagné ou perdu.")}</span>
             </div>
           </div>
         </aside>

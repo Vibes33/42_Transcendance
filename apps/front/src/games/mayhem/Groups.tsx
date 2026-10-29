@@ -10,14 +10,12 @@ function standingsAt(g: MayhemGroup, days: number, tour: MayhemTournament) {
   return [...g.members].sort((x, y) => groupRecord(g, y, days).wins - groupRecord(g, x, days).wins || tour.entrants[y].rating - tour.entrants[x].rating);
 }
 
-export function Groups({ tour, mine, names, myId, days, onWatch }: { tour: MayhemTournament; mine: number; names: Record<string, string>; myId?: string; days: number; onWatch?: (group: number, match: number) => void }) {
+export function Groups({ tour, mine, names, myId, days }: { tour: MayhemTournament; mine: number; names: Record<string, string>; myId?: string; days: number }) {
   const t = useT();
   const done = days >= MAYHEM_GROUP_DAYS;
   return (
     <div className="h-full min-h-[460px] grid gap-3.5 grid-cols-1 md:grid-cols-2 md:grid-rows-2">
-      {tour.groups.map((g, gi) => {
-        // Matchs déjà joués (journées dévoilées), du plus récent au plus ancien
-        const played = g.matches.slice(0, days * 2).map((m, mi) => ({ m, mi })).reverse();
+      {tour.groups.map((g) => {
         return (
           <section key={g.name} aria-label={t("Poule {name}", { name: g.name })} className="min-h-0 flex flex-col gap-2 p-3.5 bg-surf cut-md" style={g.members.includes(mine) ? { boxShadow: "inset 0 0 0 1.5px var(--acc)" } : undefined}>
             <div className="flex items-baseline justify-between gap-3">
@@ -45,22 +43,6 @@ export function Groups({ tour, mine, names, myId, days, onWatch }: { tour: Mayhe
                 );
               })}
             </ol>
-            {played.length > 0 && (
-              <ul className="m-0 p-0 list-none mt-auto flex flex-col gap-0.5 min-h-0 overflow-y-auto scroll">
-                {played.map(({ m, mi }) => (
-                  <li key={mi}>
-                    <button type="button" disabled={!onWatch} onClick={() => onWatch?.(gi, mi)} className="flex items-center gap-1.5 w-full min-h-[26px] p-0 border-0 bg-transparent cursor-pointer disabled:cursor-default text-left text-xs text-mut enabled:hover:text-ink">
-                      {onWatch && (
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="shrink-0 text-acc">
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                      )}
-                      <span className="truncate">{t("J{n} · {a} bat {b}", { n: Math.floor(mi / 2) + 1, a: entrantName(t, tour.entrants[m.winner], names, myId), b: entrantName(t, tour.entrants[m.winner === m.a ? m.b : m.a], names, myId) })}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
           </section>
         );
       })}

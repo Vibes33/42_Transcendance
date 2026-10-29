@@ -1,9 +1,18 @@
 import type { ComponentType } from "react";
 import type { GameKey } from "@loltr/shared";
+import { BuildPath } from "./BuildPath";
 import { ChampionDuJour } from "./ChampionDuJour";
+import { ChampionParfait } from "./ChampionParfait";
+import { ChaudFroid } from "./ChaudFroid";
+import { Codenames } from "./Codenames";
+import { ConnexionsVisuelles } from "./ConnexionsVisuelles";
+import { FaisMoiDeviner } from "./FaisMoiDeviner";
 import { MeliMelol } from "./MeliMelol";
+import { PortraitMystere } from "./PortraitMystere";
+import { Qcm } from "./Qcm";
 import { SortsEclair } from "./SortsEclair";
 import { SplashMystere } from "./SplashMystere";
+import { SudokuLol } from "./SudokuLol";
 import { WorldMayhem } from "./WorldMayhem";
 import type { GameProps } from "./types";
 import type { TourStep } from "../components/Tutorial";
@@ -54,5 +63,15 @@ export const GAME_UI: Record<GameKey, { component: ComponentType<GameProps>; tut
       { target: "mayhem-map", title: "Un joueur par poste", text: "Tes joueurs prennent place sur la carte. Les joueurs d’un même roster se complètent : duo bot, mid-jungle…" },
       { target: "mayhem-score", title: "Ta note d’équipe", text: "Elle combine la note des cartes et les liens. Valide ton équipe pour lancer un tournoi à 8 : quarts, demies, finale." }
     ]
-  }
+  },
+  // Jeux ajoutés après le lancement : pas encore de tutoriel guidé (les règles sont rappelées à l'écran)
+  portrait: { component: PortraitMystere, tutorial: [] },
+  connexions: { component: ConnexionsVisuelles, tutorial: [] },
+  chaudfroid: { component: ChaudFroid, tutorial: [] },
+  codenames: { component: Codenames, tutorial: [] },
+  buildpath: { component: BuildPath, tutorial: [] },
+  devine: { component: FaisMoiDeviner, tutorial: [] },
+  qcm: { component: Qcm, tutorial: [] },
+  parfait: { component: ChampionParfait, tutorial: [] },
+  sudoku: { component: SudokuLol, tutorial: [] }
 };

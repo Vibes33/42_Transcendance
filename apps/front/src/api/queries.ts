@@ -48,7 +48,7 @@ export interface ClassementMe {
 
 export interface HistoryGame {
   game: GameKey;
-  result: { found?: boolean; skinFound?: boolean; tries?: number; champions?: number; correct?: number; durationMs: number };
+  result: { found?: boolean; skinFound?: boolean; tries?: number; champions?: number; correct?: number; score?: number; solved?: boolean; durationMs: number };
   base: number;
   bonus: number;
   projected: number;

@@ -13,6 +13,11 @@ export interface RoundResult {
   champions?: number;
   /** Bonnes réponses (Sorts éclair). */
   correct?: number;
+  /** Jeux ajoutés après le lancement : score de la manche (points du jeu, sans lien avec le défi). */
+  score?: number;
+  /** Champion parfait : champion élu. Sudoku : grille réussie. */
+  winner?: string;
+  solved?: boolean;
   /** World Mayhem : note d'équipe et victoires en tournoi. */
   rating?: number;
   wins?: number;
@@ -31,7 +36,8 @@ export function basePoints(r: RoundResult): number {
       return (r.correct ?? 0) >= SUCCESS.se.atLeast ? BASE_POINTS : 0;
     case "splash":
       return (r.found ? SPLASH_CHAMPION_POINTS : 0) + (r.found && r.skinFound ? SPLASH_SKIN_POINTS : 0);
-    case "mayhem":
+    default:
+      // World Mayhem et jeux hors défi du jour : aucun point de base
       return 0;
   }
 }
@@ -48,6 +54,12 @@ export function hasPerformance(r: RoundResult): boolean {
       return (r.correct ?? 0) > 0;
     case "mayhem":
       return (r.rating ?? 0) > 0;
+    case "sudoku":
+      return !!r.solved;
+    case "parfait":
+      return !!r.winner;
+    default:
+      return (r.score ?? 0) > 0;
   }
 }
 
@@ -67,6 +79,10 @@ export function compareResults(a: RoundResult, b: RoundResult): number {
       return (b.correct ?? 0) - (a.correct ?? 0);
     case "mayhem":
       return (b.rating ?? 0) + 2 * (b.wins ?? 0) - ((a.rating ?? 0) + 2 * (a.wins ?? 0));
+    case "sudoku":
+      return a.durationMs - b.durationMs;
+    default:
+      return (b.score ?? 0) - (a.score ?? 0) || a.durationMs - b.durationMs;
   }
 }
 

@@ -18,8 +18,8 @@ import {
 } from "@loltr/shared";
 import { callerPlugin, fail, health, internalGuard, requireAccount, requireSession, requireTester, type Caller, type EventMap, type EventType } from "@loltr/shared/server";
 import type { Db } from "./db";
-import { daily, rounds, seen } from "./schema";
-import { ENGINES } from "./games";
+import { daily, parties, rounds, seen } from "./schema";
+import { ENGINES, PARTIES } from "./games";
 import type { MayhemState } from "./games/mayhem";
 import { botFill } from "./games/mayhemDraft";
 import { simulateTournament } from "./games/mayhemSim";
@@ -163,6 +163,38 @@ export function createJeuxApp(deps: JeuxDeps) {
     return r!;
   }
 
+  /** Partie partagée ouverte du groupe pour ce jeu (créée par le premier arrivé). */
+  async function openParty(game: GameKey, sessionId: string, me: string, t: number): Promise<string> {
+    const s = await deps.session(sessionId);
+    if (!s || !s.members.includes(me)) fail(403, "not_in_session");
+    const party = PARTIES[game]!;
+    const open = db.select().from(parties).where(and(eq(parties.sessionId, sessionId), eq(parties.game, game), eq(parties.over, false))).orderBy(desc(parties.createdAt)).get();
+    if (open) return open.id;
+    if (s!.members.length < party.minPlayers) fail(409, "not_enough_players", `Il faut au moins ${party.minPlayers} joueurs dans le groupe.`);
+    const id = crypto.randomUUID();
+    db.insert(parties).values({ id, sessionId, game, state: party.create(id, s!.members, t), createdAt: t }).run();
+    return id;
+  }
+
+  /** État partagé à jour (fin de tour selon l'heure) ; à la fin, les manches de tous se closent. */
+  async function syncParty(partyId: string, t: number) {
+    const row = db.select().from(parties).where(eq(parties.id, partyId)).get();
+    if (!row) fail(404, "party_not_found");
+    const party = PARTIES[row!.game as GameKey]!;
+    const state = party.tick(row!.state, t);
+    if (state !== row!.state) db.update(parties).set({ state, over: party.isOver(state) }).where(eq(parties.id, partyId)).run();
+    if (party.isOver(state)) {
+      const open = db.select().from(rounds).where(and(eq(rounds.game, row!.game), eq(rounds.sessionId, row!.sessionId), eq(rounds.over, false))).all();
+      for (const r of open) {
+        if ((r.state as { partyId: string }).partyId !== partyId) continue;
+        const st = { ...(r.state as object), score: party.scoreOf(state, r.userId), endedAt: t };
+        db.update(rounds).set({ state: st }).where(eq(rounds.id, r.id)).run();
+        await finalize({ ...r, state: st }, t);
+      }
+    }
+    return { row: row!, party, state };
+  }
+
   /** Le jeu classique est-il débloqué (par moi, ou par un membre de mon groupe) ? */
   async function classicUnlocked(userId: string, game: GameKey): Promise<boolean> {
     if (await deps.owns(userId, "game:" + game)) return true;
@@ -265,6 +297,14 @@ export function createJeuxApp(deps: JeuxDeps) {
           if (!s || s.kind !== "stream" || !s.members.includes(me)) fail(403, "not_in_session");
           seed = s!.seed + ":" + game;
         }
+        // Sudoku : la grille du jour, la même pour tout le monde
+        if (game === "sudoku") seed = "sudoku:" + dayKey(t);
+        // Jeux à plateau partagé : la manche de chacun pointe vers la partie du groupe
+        const party = PARTIES[game];
+        if (party) {
+          if (body.context !== "classique" || !body.sessionId) fail(409, "group_required", "Ce jeu se joue en groupe.");
+          seed = await openParty(game, body.sessionId!, me, t);
+        }
         const engine = ENGINES[game];
         const { state, contentKey } = engine.create({ seed, now: t, seen: body.context === "streamer" ? new Set() : seenSet(me, game), group: body.context === "classique" && !!body.sessionId });
         const id = crypto.randomUUID();
@@ -324,6 +364,76 @@ export function createJeuxApp(deps: JeuxDeps) {
       { body: t.Object({ quit: t.Optional(t.Boolean()) }) }
     )
     // Images servies par le serveur : leur adresse d'origine trahirait la réponse.
+    // Plateau partagé d'un jeu de groupe : vue du joueur (rafraîchie par l'interface) et actions
+    .get("/party/:roundId", async ({ caller, params }) => {
+      const r = await loadRound(params.roundId, caller);
+      const partyId = (r.state as { partyId?: string }).partyId;
+      if (!partyId) fail(404, "party_not_found");
+      const t = now();
+      const { party, state } = await syncParty(partyId!, t);
+      return { view: party.view(state, r.userId, t), round: toState(db.select().from(rounds).where(eq(rounds.id, r.id)).get()!, t) };
+    })
+    .post(
+      "/party/:roundId/act",
+      async ({ caller, params, body }) => {
+        const r = await loadRound(params.roundId, caller);
+        const partyId = (r.state as { partyId?: string }).partyId;
+        if (!partyId || r.over) fail(409, "round_over", "La partie est terminée.");
+        const t = now();
+        const { party, state } = await syncParty(partyId!, t);
+        const next = party.act(state, r.userId, body as Record<string, unknown>, t);
+        db.update(parties).set({ state: next, over: party.isOver(next) }).where(eq(parties.id, partyId!)).run();
+        const after = await syncParty(partyId!, t);
+        return { view: after.party.view(after.state, r.userId, t), round: toState(db.select().from(rounds).where(eq(rounds.id, r.id)).get()!, t) };
+      },
+      { body: t.Record(t.String(), t.Unknown()) }
+    )
+    // Champion parfait : champions élus par la communauté (aujourd'hui et depuis toujours)
+    .get("/parfait/stats", ({ caller }) => {
+      const today = dayKey(now());
+      const rows = db.select().from(rounds).where(and(eq(rounds.game, "parfait"), eq(rounds.over, true))).all();
+      const tally = (list: typeof rows) => {
+        // Un vote par joueur et par jour : son dernier champion parfait
+        const last = new Map<string, string>();
+        for (const r of list.sort((a, b) => (a.finishedAt ?? 0) - (b.finishedAt ?? 0))) {
+          const w = (r.result as { winner?: string } | null)?.winner;
+          if (w) last.set(r.userId + ":" + r.day, w);
+        }
+        const counts = new Map<string, number>();
+        for (const w of last.values()) counts.set(w, (counts.get(w) ?? 0) + 1);
+        const total = last.size;
+        return { total, top: [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([champion, n]) => ({ champion, share: n / total })), rank: (id: string) => [...counts.entries()].sort((a, b) => b[1] - a[1]).findIndex(([c]) => c === id) + 1, share: (id: string) => (counts.get(id) ?? 0) / Math.max(1, total) };
+      };
+      const day = tally(rows.filter((r) => r.day === today));
+      const all = tally(rows);
+      const mine = caller.id ? rows.filter((r) => r.userId === caller.id).sort((a, b) => (b.finishedAt ?? 0) - (a.finishedAt ?? 0))[0] : undefined;
+      const myWinner = (mine?.result as { winner?: string } | null)?.winner ?? null;
+      return {
+        day: { total: day.total, top: day.top },
+        all: { total: all.total, top: all.top },
+        mine: myWinner ? { champion: myWinner, rankToday: day.rank(myWinner) || null, shareToday: day.share(myWinner), rankAll: all.rank(myWinner) || null } : null
+      };
+    })
+    // Sudoku LoL : temps des grilles du jour réussies (première grille de chacun)
+    .get("/sudoku/stats", ({ caller }) => {
+      const today = dayKey(now());
+      const rows = db.select().from(rounds).where(and(eq(rounds.game, "sudoku"), eq(rounds.day, today), eq(rounds.over, true))).all();
+      const first = new Map<string, number>();
+      for (const r of rows.sort((a, b) => a.startedAt - b.startedAt)) {
+        const res = r.result as { solved?: boolean; durationMs?: number } | null;
+        if (res?.solved && !first.has(r.userId)) first.set(r.userId, res.durationMs ?? 0);
+      }
+      const times = [...first.values()].sort((a, b) => a - b);
+      const mine = caller.id ? first.get(caller.id) ?? null : null;
+      return {
+        day: today,
+        solvers: times.length,
+        medianMs: times.length ? times[Math.floor(times.length / 2)] : null,
+        mine,
+        // Part des joueurs plus lents que moi
+        fasterThan: mine !== null && times.length > 1 ? times.filter((x) => x > mine).length / (times.length - 1) : null
+      };
+    })
     .get("/rounds/:id/image/:slot", async ({ caller, params, set }) => {
       const r = await loadRound(params.id, caller);
       const url = ENGINES[r.game as GameKey].image?.(r.state, params.slot);
@@ -356,7 +466,7 @@ export function createJeuxApp(deps: JeuxDeps) {
       const ready = members.filter((m) => m.locked);
       if (!tournament && ready.length > 0 && members.every((m) => m.locked || m.gone)) {
         const order = shuffle(ready.map((m) => m.userId), rng(params.sessionId + ":tableau")).slice(0, MAYHEM_ENTRANTS);
-        const entrants: MayhemEntrant[] = order.map((u) => ({ kind: "friend", userId: u, picks: stateOf(u)!.picks, rating: mayhemRating(stateOf(u)!.picks).rating, crest: stateOf(u)!.crest ?? undefined }));
+        const entrants: MayhemEntrant[] = order.map((u) => ({ kind: "friend", userId: u, picks: stateOf(u)!.picks, rating: mayhemRating(stateOf(u)!.picks, stateOf(u)!.crest?.id).rating, crest: stateOf(u)!.crest ?? undefined }));
         tournament = simulateTournament(params.sessionId + ":" + order.map((u) => latest.get(u)!.id).join(","), [...entrants, ...botFill(params.sessionId, MAYHEM_ENTRANTS - entrants.length, entrants.flatMap((e) => (e.crest ? [e.crest.id] : [])))]);
         for (const u of order) {
           const r = latest.get(u)!;
@@ -366,7 +476,8 @@ export function createJeuxApp(deps: JeuxDeps) {
       }
       return { members, tournament, me: tournament ? tournament.entrants.findIndex((e) => e.userId === me) : -1 };
     })
-    // Équipe du jour : meilleur score du jour (note d'équipe + 2 points par victoire), mondial ou entre copains.
+    // Équipe du jour : meilleure note d'équipe du jour, que le tournoi soit gagné ou perdu (dès que
+    // l'équipe est validée), mondial ou entre copains. Les victoires ne départagent que les ex aequo.
     .get(
       "/mayhem/day",
       async ({ caller, query }) => {
@@ -378,19 +489,19 @@ export function createJeuxApp(deps: JeuxDeps) {
           ids = new Set([u, ...((await deps.friends?.(u)) ?? [])]);
         }
         const best = new Map<string, { userId: string; rating: number; wins: number; score: number; picks: MayhemState["picks"]; crest: MayhemState["crest"]; at: number }>();
-        const rows = db.select().from(rounds).where(and(eq(rounds.game, "mayhem"), eq(rounds.day, day), eq(rounds.over, true), eq(rounds.kind, "user"))).all();
+        const rows = db.select().from(rounds).where(and(eq(rounds.game, "mayhem"), eq(rounds.day, day), eq(rounds.kind, "user"))).all();
         for (const r of rows) {
           if (ids && !ids.has(r.userId)) continue;
-          const res = r.result as { rating?: number; wins?: number } | null;
           const st = r.state as MayhemState;
           if (!st.locked) continue;
-          const rating = res?.rating ?? 0;
-          const wins = res?.wins ?? 0;
-          const score = rating + 2 * wins;
+          const rating = mayhemRating(st.picks, st.crest?.id).rating;
+          // Victoires connues seulement une fois le tournoi fini (sinon on dévoilerait sa fin)
+          const wins = r.over ? ((r.result as { wins?: number } | null)?.wins ?? 0) : 0;
+          const score = rating;
           const cur = best.get(r.userId);
-          if (!cur || score > cur.score || (score === cur.score && (r.finishedAt ?? 0) < cur.at)) best.set(r.userId, { userId: r.userId, rating, wins, score, picks: st.picks, crest: st.crest ?? null, at: r.finishedAt ?? 0 });
+          if (!cur || score > cur.score || (score === cur.score && (wins > cur.wins || (wins === cur.wins && r.startedAt < cur.at)))) best.set(r.userId, { userId: r.userId, rating, wins, score, picks: st.picks, crest: st.crest ?? null, at: r.startedAt });
         }
-        const sorted = [...best.values()].sort((a, b) => b.score - a.score || a.at - b.at);
+        const sorted = [...best.values()].sort((a, b) => b.score - a.score || b.wins - a.wins || a.at - b.at);
         const top = sorted.slice(0, 10);
         const myIdx = me ? sorted.findIndex((x) => x.userId === me) : -1;
         const wanted = [...new Set([...top.map((x) => x.userId), ...(myIdx >= 0 ? [me!] : [])])];

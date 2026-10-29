@@ -24,6 +24,10 @@ export function resultLine(g: Pick<HistoryGame, "game" | "result">): string {
       return t("{n} " + plural(r.correct ?? 0, "bonne réponse", "bonnes réponses"), { n: r.correct ?? 0 });
     case "mayhem":
       return t("Note {n}", { n: (r as { rating?: number }).rating ?? 0 });
+    case "sudoku":
+      return r.solved ? t("Grille réussie") : t("Grille ratée");
+    default:
+      return t("{n} pts", { n: r.score ?? 0 });
   }
 }
 

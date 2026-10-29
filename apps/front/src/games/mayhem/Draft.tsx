@@ -209,21 +209,27 @@ export function Draft({ pub, busy, rolling, onPick, onReroll, onLock }: { pub: M
         </div>
         <div className="flex-1 min-h-[120px] flex flex-col gap-2 py-3 px-4 bg-surf cut-md overflow-hidden">
           <span className="label shrink-0">{t("Liens actifs")}</span>
-          {r.links.length === 0 && <span className="text-sm leading-normal text-mut">{t("Aucun lien pour l’instant : associe des joueurs du même roster, ou de la même structure.")}</span>}
+          {r.links.length === 0 && <span className="text-sm leading-normal text-mut">{t("Aucun lien pour l’instant : associe des joueurs qui ont déjà joué ensemble, du même roster ou de la même structure.")}</span>}
           <ul className="m-0 p-0 list-none flex flex-col gap-1 overflow-y-auto scroll min-h-0">
             {r.links.map((l, i) => (
               <li key={i} className="flex items-center gap-2 py-1.5 px-2.5 bg-surf2 cut-sm">
                 <span className="flex-auto min-w-0 flex flex-col">
                   <strong className="text-[13.5px] truncate">{l.names}</strong>
                   <span className="text-xs text-mut truncate">
-                    {l.same === "noyau" ? t("Noyau de {n} joueurs du même roster", { n: l.ref }) : t("{kind} · {same} ({ref})", { kind: t(l.kind), same: l.same === "roster" ? t("même roster") : t("même structure"), ref: l.ref })}
+                    {l.same === "noyau"
+                      ? t("Noyau de {n} joueurs du même roster", { n: l.ref })
+                      : l.same === "ecusson"
+                        ? t("Écusson : {n} joueurs de {org}", { n: l.ref, org: l.names })
+                        : l.same === "passe"
+                          ? t("{kind} · déjà coéquipiers ({n} saison(s))", { kind: t(l.kind), n: l.ref })
+                          : t("{kind} · {same} ({ref})", { kind: t(l.kind), same: l.same === "roster" ? t("même roster") : t("même structure"), ref: l.ref })}
                   </span>
                 </span>
                 <span className="font-d font-bold text-acc">+{l.bonus}</span>
               </li>
             ))}
           </ul>
-          <span className="shrink-0 text-[11.5px] leading-snug text-mut">{t("Duo bot +4 · mid-jungle +3 · top-jungle et jungle-support +2 · autre paire du même roster +1 · même structure : moitié · 3 du même roster +3")}</span>
+          <span className="shrink-0 text-[11.5px] leading-snug text-mut">{t("Duo bot +4 · mid-jungle +3 · top-jungle et jungle-support +2 · autre paire du même roster +1 · déjà coéquipiers une autre année ou même structure : moitié (min. +1) · 3 du même roster +3 · écusson : 3 joueurs de la structure +1, 4 ou plus +2")}</span>
         </div>
         <div className="shrink-0 flex flex-col gap-2 py-3 px-4 bg-surf cut-md">
           <button

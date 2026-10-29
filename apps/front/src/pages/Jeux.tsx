@@ -113,7 +113,7 @@ export function Jeux() {
             )}
             {playable && gc.key !== "mayhem" && (
               <>
-                {owned || !me.isUser ? (
+                {(owned || !me.isUser) && !gc.solo ? null : owned || !me.isUser ? (
                   <span className="tipw">
                     <button
                       type="button"
@@ -136,10 +136,13 @@ export function Jeux() {
                     {t("Débloquer")} · <Shard size={20} /> {fmt(CLASSIC_UNLOCK_PRICE)}
                   </button>
                 )}
-                <button type="button" onClick={group} className="relative h-[clamp(48px,6vh,60px)] px-12 border-0 bg-ink text-ink para cursor-pointer font-d font-bold text-lg tracking-[0.06em] uppercase">
-                  <span aria-hidden="true" className="absolute inset-[2px] para" style={{ background: me.inGroup ? "color-mix(in srgb, var(--acc) 18%, var(--surf))" : "var(--surf)" }} />
-                  <span className="relative">{t("Jouer avec des amis")}</span>
-                </button>
+                {/* Jeux seulement solo (Champion parfait, Sudoku) : pas de partie entre amis */}
+                {gc.multi && (
+                  <button type="button" onClick={group} className="relative h-[clamp(48px,6vh,60px)] px-12 border-0 bg-ink text-ink para cursor-pointer font-d font-bold text-lg tracking-[0.06em] uppercase">
+                    <span aria-hidden="true" className="absolute inset-[2px] para" style={{ background: me.inGroup ? "color-mix(in srgb, var(--acc) 18%, var(--surf))" : "var(--surf)" }} />
+                    <span className="relative">{t("Jouer avec des amis")}</span>
+                  </button>
+                )}
               </>
             )}
             {gc.key === "cdj" && (
