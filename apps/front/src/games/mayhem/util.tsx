@@ -163,7 +163,7 @@ export function eventText(t: ReturnType<typeof useT>, e: MayhemEvent, side: { a:
 }
 
 /** Carte de la Faille : minimap officielle, structures et camps à leurs coordonnées. */
-export function Rift({ children }: { children?: ReactNode }) {
+export function Rift({ children, down, objectives, minions }: { children?: ReactNode; down?: Record<"a" | "b", Set<number>>; objectives?: { dragon: boolean; herald: boolean; baron: boolean }; minions?: { x: number; y: number; side: "a" | "b" }[] }) {
   const camp = { blue: "#4FA3FF", red: "#FF6B4A", camp: "#D9C27A", scuttle: "#7BD3C0" };
   return (
     <div className="absolute inset-0" style={{ background: "#0B0F0D" }}>
@@ -172,8 +172,9 @@ export function Rift({ children }: { children?: ReactNode }) {
         {RIFT.camps.map((c, i) => (
           <circle key={i} cx={c.at[0]} cy={c.at[1]} r={c.kind === "camp" ? 0.9 : c.kind === "scuttle" ? 0.8 : 1.1} fill={camp[c.kind]} stroke="#0B0F0D" strokeWidth="0.3" />
         ))}
-        <path d={`M${RIFT.baron[0]} ${RIFT.baron[1] - 1.6}l1.6 1.6l-1.6 1.6l-1.6 -1.6z`} fill="#B58CFF" stroke="#0B0F0D" strokeWidth="0.3" />
-        <path d={`M${RIFT.dragon[0]} ${RIFT.dragon[1] - 1.6}l1.6 1.6l-1.6 1.6l-1.6 -1.6z`} fill="#FFB25B" stroke="#0B0F0D" strokeWidth="0.3" />
+        {/* En diffusion, les objectifs neutres sont des jetons posés par la retransmission */}
+        {!objectives && <path d={`M${RIFT.baron[0]} ${RIFT.baron[1] - 1.6}l1.6 1.6l-1.6 1.6l-1.6 -1.6z`} fill="#B58CFF" stroke="#0B0F0D" strokeWidth="0.3" />}
+        {!objectives && <path d={`M${RIFT.dragon[0]} ${RIFT.dragon[1] - 1.6}l1.6 1.6l-1.6 1.6l-1.6 -1.6z`} fill="#FFB25B" stroke="#0B0F0D" strokeWidth="0.3" />}
         {(["a", "b"] as const).map((s) => {
           const col = s === "a" ? "#5B9BFF" : "#FF5A5A";
           const [nx, ny] = RIFT.nexus[s];
@@ -183,13 +184,18 @@ export function Rift({ children }: { children?: ReactNode }) {
                 <circle key={i} cx={x} cy={y} r="1.1" fill={col} stroke="#0B0F0D" strokeWidth="0.3" />
               ))}
               <path d={`M${nx} ${ny - 2}l2 2l-2 2l-2 -2z`} fill={col} stroke="#0B0F0D" strokeWidth="0.4" />
-              {RIFT.towers[s].map(([x, y], i) => (
-                <rect key={i} x={x - 0.9} y={y - 0.9} width="1.8" height="1.8" fill={col} stroke="#0B0F0D" strokeWidth="0.3" />
-              ))}
+              {RIFT.towers[s].map(([x, y], i) => (down?.[s].has(i) ? null : <rect key={i} x={x - 0.9} y={y - 0.9} width="1.8" height="1.8" fill={col} stroke="#0B0F0D" strokeWidth="0.3" />))}
             </g>
           );
         })}
       </svg>
+      {minions && (
+        <svg viewBox="0 0 100 100" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none">
+          {minions.map((m, i) => (
+            <circle key={i} cx={m.x} cy={m.y} r="0.55" fill={m.side === "a" ? "#7FB2FF" : "#FF8C8C"} stroke="#0B0F0D" strokeWidth="0.15" />
+          ))}
+        </svg>
+      )}
       {children}
     </div>
   );

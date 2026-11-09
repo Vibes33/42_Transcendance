@@ -101,6 +101,13 @@ export function useMe() {
   };
 }
 
+/** Icône de l'onglet : le logo sur fond transparent, à la couleur d'accent du site. */
+function setFavicon(color: string) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 34"><path d="M9 1h24v24l-8 8H1V9z" fill="none" stroke="${color}" stroke-width="2"/><path d="M17 8l9 9-9 9-9-9z" fill="${color}"/></svg>`;
+  const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (link) link.href = "data:image/svg+xml," + encodeURIComponent(svg);
+}
+
 /** Applique le mode, la langue et l'accent au document (variables CSS de la maquette). */
 export function useApplyTheme() {
   const { themeKey, profile, skin, random } = useMe();
@@ -121,7 +128,9 @@ export function useApplyTheme() {
     const root = document.documentElement;
     root.classList.toggle("dark", mode === "dark");
     root.classList.toggle("light", mode === "light");
-    root.style.setProperty("--acc", !override && skinAccent ? skinAccent[mode === "dark" ? 0 : 1] : accentFor(override ?? themeKey, mode));
+    const acc = !override && skinAccent ? skinAccent[mode === "dark" ? 0 : 1] : accentFor(override ?? themeKey, mode);
+    root.style.setProperty("--acc", acc);
+    setFavicon(acc);
     root.lang = lang;
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", mode === "dark" ? "#0F1115" : "#F1F1EE");
   }, [mode, override, themeKey, lang, skinAccent]);

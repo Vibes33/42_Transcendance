@@ -211,6 +211,49 @@ export const RIFT = {
   }
 };
 
+/** Les 3 voies (top, mid, bot), de la base bleue à la base rouge, en % de la carte. */
+export const LANE_PATHS: [number, number][][] = [
+  [P(1551, 1659), P(1500, 2600), P(1169, 4287), P(1512, 6699), P(981, 10441), P(1000, 13800), P(4318, 13875), P(7943, 13411), P(10481, 13650), P(12200, 13200), P(13276, 13265)],
+  [P(1551, 1659), P(3651, 3696), P(5048, 4812), P(5846, 6396), P(7400, 7500), P(8955, 8510), P(9767, 10113), P(11134, 11207), P(13276, 13265)],
+  [P(1551, 1659), P(4281, 1253), P(6919, 1483), P(10504, 1029), P(14000, 1500), P(13866, 4505), P(13327, 8226), P(13624, 10572), P(13276, 13265)]
+];
+
+/** Longueurs cumulées de chaque voie (pour placer un point par son avancée 0 → 1). */
+const LANE_LEN = LANE_PATHS.map((path) => {
+  const acc = [0];
+  for (let i = 1; i < path.length; i++) acc.push(acc[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]));
+  return acc;
+});
+
+/** Point d'une voie à l'avancée s (0 : base bleue, 1 : base rouge). */
+export function laneAt(lane: number, s: number): [number, number] {
+  const path = LANE_PATHS[lane];
+  const len = LANE_LEN[lane];
+  const d = Math.max(0, Math.min(1, s)) * len[len.length - 1];
+  let i = 1;
+  while (i < path.length - 1 && len[i] < d) i++;
+  const k = (d - len[i - 1]) / (len[i] - len[i - 1] || 1);
+  return [path[i - 1][0] + (path[i][0] - path[i - 1][0]) * k, path[i - 1][1] + (path[i][1] - path[i - 1][1]) * k];
+}
+
+/** Avancée (0 → 1) du point de la voie le plus proche d'un point de la carte. */
+export function laneProgress(lane: number, x: number, y: number): number {
+  let best = 0;
+  let bestD = Infinity;
+  for (let k = 0; k <= 200; k++) {
+    const [px, py] = laneAt(lane, k / 200);
+    const d = (px - x) ** 2 + (py - y) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = k / 200;
+    }
+  }
+  return best;
+}
+
+/** Temps de réapparition (s) d'un joueur mort à la seconde `t` de la partie : plus long en fin de partie. */
+export const mayhemRespawn = (t: number) => Math.round(Math.min(55, 7 + t * 0.026));
+
 // --- Tournoi simulé (calculé par le serveur, rejoué par l'interface) ------------------------------
 
 export interface MayhemEntrant {
@@ -242,6 +285,8 @@ export interface MayhemEvent {
   victim?: number;
   who: { a: number[]; b: number[] };
   dead: { a: number[]; b: number[] };
+  /** Chaque élimination : [côté du tueur, tueur, victime, assistants] (absent des anciens tournois). */
+  ks?: ["a" | "b", number, number, number[]][];
 }
 
 export interface MayhemGame {

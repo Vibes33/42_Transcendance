@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { MAYHEM_CREST_BY_ID, MAYHEM_ROLES, MAYHEM_TEAM_BY_ID, mayhemRating, mayhemWins, rosterPicks } from "@loltr/content";
+import { MAYHEM_CREST_BY_ID, MAYHEM_ROLES, MAYHEM_TEAM_BY_ID, buildMovement, mayhemRating, mayhemRespawn, mayhemWins, rosterPicks } from "@loltr/content";
 import { mayhem, type MayhemState } from "./games/mayhem";
 import { botFill } from "./games/mayhemDraft";
 import { simulateTournament } from "./games/mayhemSim";
@@ -162,6 +162,75 @@ describe("World Mayhem", () => {
           const kills = ev.reduce((n, e) => n + e.ka, 0);
           expect(g.kda.a.reduce((n, k) => n + k[0], 0)).toBe(kills);
         }
+      }
+    }
+  });
+
+  test("déplacements : les 10 joueurs bougent en permanence, restent sur la carte et suivent les morts", () => {
+    const t = simulateTournament("mv", botFill("f", 16));
+    const g = t.rounds[2][0].games[0];
+    const mv = buildMovement(g);
+    expect(JSON.stringify(buildMovement(g).actors(600))).toBe(JSON.stringify(mv.actors(600)));
+    let still = 0;
+    let total = 0;
+    let prev = mv.actors(0);
+    for (let s = 1; s < g.duration; s++) {
+      const cur = mv.actors(s);
+      for (const side of ["a", "b"] as const)
+        cur[side].forEach((p, i) => {
+          expect(p.x).toBeGreaterThanOrEqual(0);
+          expect(p.x).toBeLessThanOrEqual(100);
+          expect(p.y).toBeGreaterThanOrEqual(0);
+          expect(p.y).toBeLessThanOrEqual(100);
+          const q = prev[side][i];
+          if (p.dead || q.dead || p.recall || q.recall) return;
+          total++;
+          if (Math.hypot(p.x - q.x, p.y - q.y) < 0.05) still++;
+          // Jamais plus vite qu'un champion (≈ 2,5 % de la carte par seconde)
+          expect(Math.hypot(p.x - q.x, p.y - q.y)).toBeLessThan(3);
+        });
+      prev = cur;
+    }
+    expect(still / total).toBeLessThan(0.12);
+    // Un joueur éliminé est signalé mort pendant sa réapparition
+    const death = g.events.find((e) => e.dead.a.length || e.dead.b.length)!;
+    const side = death.dead.a.length ? "a" : "b";
+    expect(mv.actors(death.t + 3)[side][death.dead[side][0]].dead).toBe(true);
+    expect(mv.actors(death.t + mayhemRespawn(death.t) + 2)[side][death.dead[side][0]].dead).toBe(false);
+    // Les K/D/A en direct finissent sur ceux de la partie
+    expect(mv.kda(g.duration)).toEqual(g.kda);
+    // Une tour détruite disparaît de la carte
+    const tower = g.events.find((e) => e.kind === "tower")!;
+    expect(mv.towersDown(tower.t - 1)[tower.side === "a" ? "b" : "a"].size).toBeLessThan(mv.towersDown(tower.t + 1)[tower.side === "a" ? "b" : "a"].size);
+  });
+
+  test("les parties suivent les vraies parties pro (Oracle's Elixir) : durée, kills, tours, objectifs", () => {
+    const games = [0, 1, 2, 3, 4, 5].flatMap((i) => {
+      const t = simulateTournament("cal" + i, botFill("cal" + i, 16));
+      return [...t.groups.flatMap((g) => g.matches), ...t.rounds.flat()].flatMap((m) => m.games);
+    });
+    const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[xs.length >> 1];
+    const kills = (g: (typeof games)[0], s: "a" | "b") => g.kda[s].reduce((n, k) => n + k[0], 0);
+    const win = (g: (typeof games)[0]) => (g.winner === g.blue ? "a" : "b");
+    const towers = (g: (typeof games)[0], s: "a" | "b") => g.events.filter((e) => e.kind === "tower" && e.side === s).length;
+    // Vraies parties des ligues majeures 2024-2026 : 31 min, 29 kills, 9 tours contre 2, 4 dragons
+    expect(median(games.map((g) => g.duration / 60))).toBeWithin(27, 34);
+    expect(median(games.map((g) => kills(g, "a") + kills(g, "b")))).toBeWithin(22, 34);
+    expect(median(games.map((g) => towers(g, win(g))))).toBeWithin(8, 11);
+    expect(median(games.map((g) => towers(g, win(g) === "a" ? "b" : "a")))).toBeWithin(1, 4);
+    expect(median(games.map((g) => g.events.filter((e) => e.kind === "dragon").length))).toBeWithin(3, 6);
+    // Le vainqueur détruit au moins un inhibiteur et les 2 tours du Nexus
+    for (const g of games) expect(g.events.filter((e) => e.kind === "inhib" && e.side === win(g)).length).toBeGreaterThanOrEqual(1);
+  });
+
+  test("une partie compte des combats réalistes, morts qui réapparaissent", () => {
+    const t = simulateTournament("mv2", botFill("g", 16));
+    for (const m of t.rounds.flat()) {
+      for (const g of m.games) {
+        const kills = g.kda.a.reduce((n, k) => n + k[0], 0) + g.kda.b.reduce((n, k) => n + k[0], 0);
+        expect(kills).toBeGreaterThanOrEqual(3);
+        expect(kills).toBeLessThanOrEqual(80);
+        for (const e of g.events) for (const [side, killer, victim] of e.ks ?? []) expect(e.who[side].includes(killer) || e.who[side === "a" ? "b" : "a"].includes(victim)).toBe(true);
       }
     }
   });
