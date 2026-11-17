@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { post } from "./api/client";
 import { actions } from "./api/queries";
 import { DevPanel } from "./components/DevPanel";
 import { FriendsDrawer } from "./components/FriendsDrawer";
@@ -52,16 +53,31 @@ export function App() {
     }
   }, [me.session?.userId]);
 
-  // Un coéquipier lance une partie de groupe : tout le groupe y est emmené
+  // Un coéquipier lance une partie de groupe : tout le groupe y est emmené, même depuis le récap
+  // ou la partie précédente (une nouvelle partie classique remplace l'ancienne)
   const seen = useRef<string | null>(null);
   useEffect(() => {
     if (!session || session.kind !== "group" || seen.current === session.id) return;
     seen.current = session.id;
-    if (session.phase === "playing" && path !== "/partie" && path !== "/recap") {
+    const here = (path === "/partie" || path === "/recap") && new URLSearchParams(loc.search).get("session") === session.id;
+    if (session.phase === "playing" && !here) {
       nav(partieUrl(session.context === "defi" ? "defi" : "classique", session.games[session.index], session.id));
       ui.setFriends(false);
     }
   }, [session?.id]);
+
+  // Quitter la partie de groupe par un autre chemin que le bouton (menu du haut, retour arrière) :
+  // on libère le groupe, sinon il attendrait au récap un joueur qui n'est plus là
+  const prevPath = useRef(path);
+  useEffect(() => {
+    const was = prevPath.current;
+    prevPath.current = path;
+    const inGame = (p: string) => p === "/partie" || p === "/recap";
+    const s = useLive.getState().session;
+    if (!inGame(was) || inGame(path) || !s || s.kind !== "group" || s.phase === "done") return;
+    useLive.getState().setSession(null);
+    post(`/api/temps-reel/sessions/${s.id}/leave`).catch(() => {});
+  }, [path]);
 
   if (obs)
     return (

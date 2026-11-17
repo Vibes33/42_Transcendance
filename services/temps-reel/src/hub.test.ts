@@ -64,6 +64,31 @@ describe("groupe", () => {
     expect(back.members.find((m) => m.userId === "c")!.results[0].basePoints).toBe(0);
   });
 
+  test("classique : un nouveau jeu remplace la partie en cours, avec tout le groupe (même ceux qui l'avaient quittée)", async () => {
+    const { hub, sock, inbox } = setup();
+    await hub.connect("b", sock("b"));
+    const first = await hub.createGroup("a", "classique", "meli");
+    await hub.leave(first.id, "c");
+    // Le groupe lance un autre jeu : nouvelle session, c en fait partie, l'ancienne est terminée
+    const second = await hub.createGroup("b", "classique", "se");
+    expect(second.id).not.toBe(first.id);
+    expect(second.games).toEqual(["se"]);
+    expect(second.members.map((m) => m.userId).sort()).toEqual(["a", "b", "c"]);
+    expect((await hub.get(first.id))!.phase).toBe("done");
+    expect((await hub.sessionOf("c"))!.id).toBe(second.id);
+    // b est prévenu de la fin de l'ancienne partie puis de la nouvelle
+    const sessions = inbox.b.filter((m) => m.type === "session").map((m) => (m as any).session);
+    expect(sessions.at(-1).id).toBe(second.id);
+    expect(sessions.some((s: any) => s.id === first.id && s.phase === "done")).toBe(true);
+  });
+
+  test("défi du jour en cours : il se reprend, et bloque une partie classique", async () => {
+    const { hub } = setup();
+    const s = await hub.createGroup("a", "defi");
+    expect((await hub.createGroup("b", "defi")).id).toBe(s.id);
+    await expect(hub.createGroup("b", "classique", "meli")).rejects.toThrow();
+  });
+
   test("le groupe dissous termine la session", async () => {
     const { hub } = setup();
     const s = await hub.createGroup("a", "classique", "meli");

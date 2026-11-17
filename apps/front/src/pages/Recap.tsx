@@ -36,7 +36,7 @@ export function Recap() {
   const started = useRef(Date.now());
 
   useEffect(() => {
-    if (id && !session) get<LiveSession>(`/api/temps-reel/sessions/${id}`).then((s) => useLive.getState().setSession(s)).catch(() => nav("/"));
+    if (id && !session && !useLive.getState().session) get<LiveSession>(`/api/temps-reel/sessions/${id}`).then((s) => useLive.getState().setSession(s)).catch(() => nav("/"));
   }, [id, !!session]);
 
   // Animation d'arrivée : ancien classement, puis glissement vers le nouveau et montée des totaux

@@ -205,10 +205,17 @@ export class Hub {
     const g = await this.deps.groupOf(leader);
     if (!g) fail(409, "no_group", "Crée d’abord un groupe.");
     if (g!.members.length < 2) fail(409, "group_alone", "Invite au moins un copain.");
+    const day = dayKey(this.now());
     const prev = await this.deps.store.get("rt:group:" + g!.id);
     const running = prev ? await this.get(prev) : null;
-    if (running && running.phase !== "done") return this.view(running);
-    const day = dayKey(this.now());
+    if (running && running.phase !== "done") {
+      // Le défi du jour en cours se reprend (qui l'a quitté pour le finir en solo n'y revient pas)
+      const liveDefi = running.context === "defi" && running.day === day;
+      if (liveDefi && context === "defi") return this.view(running);
+      if (liveDefi) fail(409, "defi_running", "Le groupe joue le défi du jour : finissez-le avant de lancer une autre partie.");
+      // Partie classique (ou défi d'un autre jour) : la nouvelle partie la remplace
+      await this.close(running);
+    }
     let games: GameKey[];
     if (context === "defi") games = rotationFor(day);
     else {
@@ -237,6 +244,14 @@ export class Hub {
     for (const m of s.members) await this.deps.store.set("rt:member:" + m.userId, s.id, SESSION_TTL);
     this.broadcast(s);
     return this.view(s);
+  }
+
+  /** Termine une session remplacée : ses joueurs en sont libérés. */
+  private async close(s: Internal) {
+    s.phase = "done";
+    await this.save(s);
+    for (const m of s.members) if ((await this.deps.store.get("rt:member:" + m.userId)) === s.id) await this.deps.store.del("rt:member:" + m.userId);
+    this.broadcast(s);
   }
 
   /** Le streamer ouvre une session : défi du jour (graine différente) ou jeu classique de son choix. */

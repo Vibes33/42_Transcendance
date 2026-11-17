@@ -39,7 +39,7 @@ export function Partie() {
 
   // Session de groupe ou de stream absente après un rechargement : on la redemande au serveur
   useEffect(() => {
-    if (sessionId && !session)
+    if (sessionId && !session && !useLive.getState().session)
       get<LiveSession>(`/api/temps-reel/sessions/${sessionId}`)
         .then((s) => useLive.getState().setSession(s))
         .catch(() => setError(t("Cette partie n’existe plus.")));
