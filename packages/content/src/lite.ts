@@ -6,6 +6,7 @@ export type { ChampionAttributes, Lang };
 export * from "./chibis";
 export * from "./mayhem";
 export * from "./mayhemMove";
+export { onPath, pathLength, walkable } from "./riftNav";
 export { LABELS as ATTRIBUTE_LABELS } from "./attributes";
 
 export const DDRAGON = "https://ddragon.leagueoflegends.com";

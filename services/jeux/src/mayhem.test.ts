@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { MAYHEM_CREST_BY_ID, MAYHEM_ROLES, MAYHEM_TEAM_BY_ID, buildMovement, mayhemRating, mayhemRespawn, mayhemWins, rosterPicks } from "@loltr/content";
+import { MAYHEM_CREST_BY_ID, MAYHEM_ROLES, MAYHEM_TEAM_BY_ID, buildMovement, walkable, mayhemRating, mayhemRespawn, mayhemWins, rosterPicks } from "@loltr/content";
 import { mayhem, type MayhemState } from "./games/mayhem";
 import { botFill } from "./games/mayhemDraft";
 import { simulateTournament } from "./games/mayhemSim";
@@ -192,6 +192,29 @@ describe("World Mayhem", () => {
       prev = cur;
     }
     expect(still / total).toBeLessThan(0.12);
+    // Personne ne traverse les murs : les joueurs en vie restent sur les zones praticables
+    let inWall = 0;
+    let alive = 0;
+    for (let s = 0; s < g.duration; s += 2)
+      for (const side of ["a", "b"] as const)
+        for (const p of mv.actors(s)[side]) {
+          if (p.dead) continue;
+          alive++;
+          if (!walkable(p.x, p.y)) inWall++;
+        }
+    expect(inWall / alive).toBeLessThan(0.01);
+    // Le tueur et la victime sont sur les lieux au moment de l'élimination
+    let far = 0;
+    let kills = 0;
+    for (const e of g.events)
+      for (const [side, killer, victim] of e.ks ?? []) {
+        const at = mv.actors(Math.max(0, e.t - 0.5));
+        for (const p of [at[side][killer], at[side === "a" ? "b" : "a"][victim]]) {
+          kills++;
+          if (Math.hypot(p.x - e.at[0], p.y - e.at[1]) > 10) far++;
+        }
+      }
+    expect(far / kills).toBeLessThan(0.02);
     // Un joueur éliminé est signalé mort pendant sa réapparition
     const death = g.events.find((e) => e.dead.a.length || e.dead.b.length)!;
     const side = death.dead.a.length ? "a" : "b";

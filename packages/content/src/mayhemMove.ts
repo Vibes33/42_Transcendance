@@ -1,4 +1,5 @@
 import { RIFT, laneAt, mayhemRespawn, type MayhemEvent, type MayhemGame } from "./mayhem";
+import { clearPath, pathLength, snapWalkable, steer, walkable } from "./riftNav";
 
 // Déplacements d'une partie de World Mayhem : à partir des actions décidées par le serveur (qui
 // combat où, qui meurt, quelles tours tombent), chaque joueur est animé seconde par seconde comme
@@ -17,6 +18,10 @@ export const FOUNTAIN: Record<Side, [number, number]> = { a: [6.5, 93.5], b: [93
 const SPEED = [2.0, 2.25, 2.1, 2.1, 2.0];
 /** Les sbires traversent une voie en 78 s. */
 const MINION_CROSS = 78;
+/** Axe d'un combat : de la base bleue vers la base rouge (chaque équipe se tient de son côté). */
+const AXIS: [number, number] = [Math.SQRT1_2, -Math.SQRT1_2];
+/** Place de chaque poste le long de la ligne de combat (top, jungle, mid, ADC, support). */
+const LATERAL = [-2.4, -0.9, 0.5, 1.9, 0.8];
 const LANE_PHASE_END = 840;
 
 /** Graine d'une partie : ses participants, sa durée et ses actions. */
@@ -193,7 +198,8 @@ export function buildMovement(game: MayhemGame): Movement {
         } else {
           // Rappel (retour en base) : canalisation de 8 s sur place, puis achats à la fontaine
           const nb = backs[s + i].find((b) => b >= t - 1);
-          const inFight = mine[k].some((e) => t >= e.t - LEAD[e.kind] && t <= e.t + 6);
+          // Pas de retour en base quand une action attend le joueur dans la minute
+          const inFight = mine[k].some((e) => t >= e.t - 60 && t <= e.t + 6);
           if (st.recallUntil < 0 && nb !== undefined && t >= nb && t <= nb + 2 && !inFight && Math.hypot(st.x - f[0], st.y - f[1]) > 25) {
             st.recallFrom = t;
             st.recallUntil = t + 16;
@@ -204,16 +210,35 @@ export function buildMovement(game: MayhemGame): Movement {
             if (t >= st.recallUntil) st.recallUntil = st.recallFrom = -1;
           } else {
             // Cible : une action en cours ou imminente, sinon le comportement de son poste
-            const ev = mine[k].find((e) => t >= e.t - LEAD[e.kind] && t <= e.t + 6);
+            // On part assez tôt pour arriver à temps, d'où que l'on vienne (détours des murs compris)
+            // Une action finie se quitte aussitôt si la suivante attend ailleurs
+            const ev = mine[k].find((e, j) => t <= e.t + (mine[k][j + 1] && mine[k][j + 1].t - e.t < 45 ? 1 : 6) && t >= e.t - 90 && t >= e.t - Math.min(90, Math.max(LEAD[e.kind], pathLength(st.x, st.y, e.at[0], e.at[1]) / SPEED[i] + 6)));
             let tx: number;
             let ty: number;
             let boost = 1;
             if (ev) {
               const fighting = Math.abs(t - ev.t) <= 5;
-              const ang = (i * 72 + (s === "b" ? 36 : 0)) * (Math.PI / 180) + (fighting ? t * 0.65 + phase[k].a : 0);
-              const rad = fighting ? 2.3 : 3.4;
-              tx = ev.at[0] + Math.cos(ang) * rad + (s === "a" ? -1 : 1) * 1.2;
-              ty = ev.at[1] + Math.sin(ang) * rad + (s === "a" ? 1 : -1) * 1.2;
+              const solo = ev.ka + ev.kb === 0 && (ev.kind === "dragon" || ev.kind === "baron" || ev.kind === "herald") && ev.side === s;
+              if (solo) {
+                // Objectif pris sans combat : l'équipe tape le monstre, groupée autour de la fosse
+                const ang = (i * 72) * (Math.PI / 180) + t * 0.12;
+                tx = ev.at[0] + Math.cos(ang) * 2.4;
+                ty = ev.at[1] + Math.sin(ang) * 2.4;
+              } else {
+                // Combat : deux lignes face à face (la ligne de front devant, ADC et mid derrière) qui
+                // avancent et reculent (engagement, kite) ; à l'approche, l'équipe se regroupe en retrait
+                const front = i === 0 || i === 1 || i === 4;
+                const back = s === "a" ? -1 : 1;
+                const dist = fighting ? (front ? 1.2 : 3.1) + 1.1 * Math.sin(t * 1.15 + phase[k].a) : front ? 4.2 : 6.2;
+                const lat = LATERAL[i] + 0.7 * Math.sin(t * 0.8 + phase[k].b);
+                tx = ev.at[0] + back * AXIS[0] * dist + AXIS[1] * -lat;
+                ty = ev.at[1] + back * AXIS[1] * dist + AXIS[0] * lat;
+              }
+              // Une place derrière un mur se resserre vers le lieu de l'action (même couloir)
+              for (let h = 0; h < 5 && !clearPath(ev.at[0], ev.at[1], tx, ty); h++) {
+                tx = (tx + ev.at[0]) / 2;
+                ty = (ty + ev.at[1]) / 2;
+              }
               boost = 1.1;
               if (fighting) flags[t * 10 + k] |= 4;
             } else {
@@ -222,16 +247,28 @@ export function buildMovement(game: MayhemGame): Movement {
             // Un joueur n'est jamais parfaitement immobile : petits déplacements autour de sa cible
             tx += Math.sin(t * 0.23 + phase[k].a) * 1.0;
             ty += Math.cos(t * 0.19 + phase[k].b) * 1.0;
-            const dx = tx - st.x;
-            const dy = ty - st.y;
-            const d = Math.hypot(dx, dy);
-            const v = SPEED[i] * boost * (1 + 0.05 * Math.sin(t * 0.7 + phase[k].c));
-            if (d <= v) {
-              st.x = tx;
-              st.y = ty;
-            } else {
-              st.x += (dx / d) * v;
-              st.y += (dy / d) * v;
+            [tx, ty] = snapWalkable(clamp(tx, 1, 99), clamp(ty, 1, 99));
+            // Les murs se contournent : on suit les couloirs, étape par étape, à vitesse constante
+            let left = SPEED[i] * boost * (1 + 0.05 * Math.sin(t * 0.7 + phase[k].c));
+            for (let hop = 0; hop < 3 && left > 0.01; hop++) {
+              const [wx, wy] = steer(st.x, st.y, tx, ty);
+              const dx = wx - st.x;
+              const dy = wy - st.y;
+              const d = Math.hypot(dx, dy);
+              if (d < 1e-3) break;
+              const step = Math.min(d, left);
+              let nx = st.x + (dx / d) * step;
+              let ny = st.y + (dy / d) * step;
+              // Un coin de mur frôlé : on raccourcit le pas plutôt que d'entrer dans le mur
+              for (let h = 0; h < 3 && !walkable(nx, ny); h++) {
+                nx = (nx + st.x) / 2;
+                ny = (ny + st.y) / 2;
+              }
+              if (!walkable(nx, ny)) break;
+              st.x = nx;
+              st.y = ny;
+              left -= step;
+              if (wx === tx && wy === ty) break;
             }
           }
         }

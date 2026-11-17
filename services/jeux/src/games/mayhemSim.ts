@@ -6,6 +6,9 @@ import {
   MAYHEM_TEAMS,
   RIFT,
   laneAt,
+  laneProgress,
+  onPath,
+  pathLength,
   mayhemRating,
   mayhemRespawn,
   rosterPicks,
@@ -102,6 +105,33 @@ function weighted(r: R, pool: number[], weights: readonly number[], n: number) {
   return out;
 }
 
+/** Fontaine de chaque équipe (en % de la carte). */
+const FOUNT: Record<Side, [number, number]> = { a: [6.5, 93.5], b: [93.5, 6.5] };
+/** Secondes de marche d'un point à un autre (détours des murs compris, ~2,1 % de la carte par seconde). */
+const travel = (p: [number, number], q: [number, number]) => pathLength(p[0], p[1], q[0], q[1]) / 2.05 + 6;
+
+/**
+ * Chances de présence de chaque poste (top, jungle, mid, ADC, support) à une action, selon le lieu :
+ * en phase de voie chacun est dans sa voie, le jungler partout, le mid et le support se déplacent ;
+ * ensuite les équipes se regroupent et tout le monde peut être partout.
+ */
+function presence(at: [number, number], t: number): number[] {
+  const lanes = [0, 1, 2].map((l) => {
+    const p = laneAt(l, laneProgress(l, at[0], at[1]));
+    return Math.hypot(p[0] - at[0], p[1] - at[1]);
+  });
+  const l = lanes.indexOf(Math.min(...lanes));
+  const topSide = at[0] + at[1] < 100;
+  const base =
+    lanes[l] < 6
+      ? [[1, 0.55, 0.25, 0.03, 0.1], [0.15, 0.55, 1, 0.1, 0.25], [0.03, 0.55, 0.2, 1, 1]][l]
+      : topSide
+        ? [0.35, 1, 0.6, 0.08, 0.4]
+        : [0.08, 1, 0.6, 0.35, 0.6];
+  const mix = Math.min(0.8, Math.max(0, (t - 840) / 600));
+  return base.map((w) => w * (1 - mix) + mix);
+}
+
 /** Répartit n instants triés dans [lo, hi]. */
 const times = (r: R, n: number, lo: number, hi: number) => Array.from({ length: n }, () => lo + r() * Math.max(0, hi - lo)).sort((x, y) => x - y);
 
@@ -124,6 +154,10 @@ function simGame(r: R, blue: number, red: number, ra: number, rb: number): Mayhe
   const events: MayhemEvent[] = [];
   const deadUntil = { a: [0, 0, 0, 0, 0], b: [0, 0, 0, 0, 0] };
   const alive = (s: Side, t: number) => [0, 1, 2, 3, 4].filter((i) => deadUntil[s][i] <= t);
+  // Dernière action de chaque joueur : on ne peut pas être à deux endroits à la fois
+  const seen = { a: [0, 1, 2, 3, 4].map(() => ({ t: -999, at: [50, 50] as [number, number] })), b: [0, 1, 2, 3, 4].map(() => ({ t: -999, at: [50, 50] as [number, number] })) };
+  const canReach = (s: Side, i: number, t: number, at: [number, number]) =>
+    deadUntil[s][i] + travel(FOUNT[s], at) <= t && seen[s][i].t + travel(seen[s][i].at, at) <= t;
   const end = duration - 130;
 
   // --- Plan de la partie, calqué sur le gabarit ---
@@ -205,7 +239,7 @@ function simGame(r: R, blue: number, red: number, ra: number, rb: number): Mayhe
   const finalW = Math.min(Math.max(0, lastW), int(r, 2, 4));
   const finalL = finalW && r() < 0.4 ? Math.min(1, tpl.kl - Math.max(0, marks.at(-2)![2])) : 0;
   marks[marks.length - 1] = [end, tpl.kw - finalW, tpl.kl - Math.max(0, finalL)];
-  if (finalW) plans.push({ t: end, kind: "teamfight", side: W, at: near(r, RIFT.nexus[L], 6), kills: [finalW, Math.max(0, finalL)], part: [5, 5] });
+  if (finalW) plans.push({ t: end, kind: "teamfight", side: W, at: onPath(...near(r, RIFT.nexus[L], 6)), kills: [finalW, Math.max(0, finalL)], part: [5, 5] });
   for (let i = 1; i < marks.length; i++) {
     const [a, pw, pl] = marks[i - 1];
     const [b, cw, cl] = marks[i];
@@ -220,17 +254,17 @@ function simGame(r: R, blue: number, red: number, ra: number, rb: number): Mayhe
         const k: [number, number] = [Math.min(left[s], int(r, 2, 4)), Math.min(left[o], int(r, 0, 2))];
         left[s] -= k[0];
         left[o] -= k[1];
-        plans.push({ t, kind: "teamfight", side: s, at: near(r, pick(r, SPOTS), 5), kills: k, part: [int(r, 4, 5), int(r, 4, 5)] });
+        plans.push({ t, kind: "teamfight", side: s, at: onPath(...near(r, pick(r, SPOTS), 5)), kills: k, part: [int(r, 4, 5), int(r, 4, 5)] });
       } else if (left.a + left.b >= 2 && roll < big + 0.4) {
         const k: [number, number] = [Math.min(left[s], int(r, 1, 2)), Math.min(left[o], r() < 0.4 ? 1 : 0)];
         left[s] -= k[0];
         left[o] -= k[1];
-        plans.push({ t, kind: "skirmish", side: s, at: near(r, pick(r, SPOTS), 4), kills: k, part: [int(r, 2, 4), int(r, 2, 4)] });
+        plans.push({ t, kind: "skirmish", side: s, at: onPath(...near(r, pick(r, SPOTS), 4)), kills: k, part: [int(r, 2, 4), int(r, 2, 4)] });
       } else {
         left[s]--;
         const early = t < 900;
         const lane = pick(r, [0, 1, 1, 2, 2]);
-        plans.push({ t, kind: "kill", side: s, at: early ? lanePoint(lane, 0.5 + (s === "a" ? 0.08 : -0.08) * r()) : near(r, pick(r, SPOTS), 4), kills: [1, 0], part: [early && r() < 0.5 ? 2 : int(r, 1, 3), 1] });
+        plans.push({ t, kind: "kill", side: s, at: early ? lanePoint(lane, 0.5 + (s === "a" ? 0.08 : -0.08) * r()) : onPath(...near(r, pick(r, SPOTS), 4)), kills: [1, 0], part: [early && r() < 0.5 ? 2 : int(r, 1, 3), 1] });
       }
     }
   }
@@ -247,7 +281,7 @@ function simGame(r: R, blue: number, red: number, ra: number, rb: number): Mayhe
     const fight = plans.find((p) => (p.kind === "skirmish" || p.kind === "teamfight") && p.t !== end && Math.abs(p.t - ob.t) < 75 && !snapped.has(p));
     if (!fight) continue;
     fight.t = ob.t - 6 - r() * 14;
-    fight.at = near(r, ob.at, 3);
+    fight.at = onPath(...near(r, ob.at, 3));
     snapped.add(fight);
   }
   plans.push({ t: duration, kind: "nexus", side: W, at: RIFT.nexus[L], kills: [0, 0], part: [3, 0], need: 1 });
@@ -269,13 +303,33 @@ function simGame(r: R, blue: number, red: number, ra: number, rb: number): Mayhe
       continue;
     }
     if (pl.need && aliveS.length < pl.need && !final) continue;
-    // Les actions de fin se jouent avec ce qu'il reste : les morts sont réanimés pour l'assaut final
-    const poolS = final ? [0, 1, 2, 3, 4].filter((i) => aliveS.includes(i) || pl.kind !== "teamfight") : aliveS;
-    const poolO = alive(o, t);
-    const whoS = shuffle(poolS.length ? poolS : [0], r).slice(0, Math.max(0, Math.min(pl.part[0], poolS.length || 1)));
-    const whoO = shuffle(poolO, r).slice(0, Math.max(0, Math.min(Math.max(pl.part[1], pl.kills[0]), poolO.length)));
+    // Qui peut être là : en vie, revenu de la fontaine et pas occupé ailleurs juste avant
+    const near = (side: Side, pool: number[]) => pool.filter((i) => canReach(side, i, t, pl.at));
+    const siege = final && pl.kind !== "teamfight";
+    const okS = near(s, aliveS);
+    const okO = near(o, alive(o, t));
+    // Personne ne peut arriver à temps : l'action attend que les joueurs soient sur place
+    const missing = okS.length < Math.max(1, pl.need ?? 0) || (pl.kills[0] > 0 && okO.length === 0);
+    if (!final && missing && (pl.tries ?? 0) < 6 && t + 15 < end - 10) {
+      pending.push({ ...pl, t: Math.min(end - 10, t + 12 + r() * 20), tries: (pl.tries ?? 0) + 1 });
+      continue;
+    }
+    // Un combat sans personne pour le livrer n'a pas lieu ; un objectif se prend avec qui est en vie
+    if (!final && missing && pl.kills[0] + pl.kills[1] > 0) continue;
+    // Le combat final se livre avec ceux qui sont vraiment là ; pour l'assaut final (inhibiteur,
+    // Nexus), les morts sont réanimés
+    if (!siege && !okS.length && pl.kills[0] + pl.kills[1] > 0) continue;
+    const poolS = siege ? [0, 1, 2, 3, 4] : okS.length ? okS : aliveS;
+    const poolO = okO;
+    // Les postes présents dépendent du lieu (voie, côté de la jungle) et du moment de la partie
+    const pres = presence(pl.at, t);
+    const whoS = weighted(r, poolS.length ? poolS : [0], pres, Math.max(1, Math.min(pl.part[0], poolS.length || 1)));
+    const whoO = weighted(r, poolO, pres, Math.max(0, Math.min(Math.max(pl.part[1], pl.kills[0]), poolO.length)));
+    for (const i of whoS) seen[s][i] = { t, at: pl.at };
+    for (const i of whoO) seen[o][i] = { t, at: pl.at };
     const killsS = Math.min(pl.kills[0], whoO.length);
-    const killsO = Math.min(pl.kills[1], whoS.length);
+    // Une riposte demande quelqu'un sur place pour la porter
+    const killsO = whoO.length ? Math.min(pl.kills[1], whoS.length) : 0;
     // Kills impossibles faute d'adversaires en vie : ils se jouent un peu plus tard
     const rest: [number, number] = [pl.kills[0] - killsS, pl.kills[1] - killsO];
     if (rest[0] + rest[1] > 0 && !final && (pl.tries ?? 0) < 4 && t + 30 < end - 10) {
@@ -288,7 +342,7 @@ function simGame(r: R, blue: number, red: number, ra: number, rb: number): Mayhe
     const deadS = weighted(r, whoS, roles.deaths, killsO);
     const credit = (killers: number[], assist: number[], victims: number[], from: Side) => {
       for (const v of victims) {
-        const killer = weighted(r, killers, roles.kills, 1)[0];
+        const killer = weighted(r, killers, roles.kills.map((k, i) => k * pres[i]), 1)[0];
         kda[from][killer][0]++;
         const helpers = assist.filter((a) => a !== killer && r() < Math.min(0.95, 0.5 + roles.assists[a] * 1.6));
         for (const a of helpers) kda[from][a][2]++;

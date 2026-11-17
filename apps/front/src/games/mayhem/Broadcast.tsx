@@ -20,7 +20,9 @@ type Speed = (typeof SPEEDS)[number];
 /** Vitesse des temps morts. */
 const FAST = 36;
 /** Vitesse pendant une action sans élimination, selon son type. */
-const PACE: Record<MayhemEvent["kind"], number> = { firstblood: 4, kill: 4.5, skirmish: 3.5, teamfight: 2.5, dragon: 5, herald: 6, baron: 3, tower: 9, inhib: 6, nexus: 2.5 };
+const PACE: Record<MayhemEvent["kind"], number> = { firstblood: 2.2, kill: 2.8, skirmish: 2, teamfight: 1.2, dragon: 3.5, herald: 4, baron: 1.5, tower: 6, inhib: 4, nexus: 1.2 };
+/** Le ralenti le plus fort couvre l'instant de l'action (de −CLIMAX s à +AFTER s) ; l'approche est 3 fois moins lente. */
+const CLIMAX = 5;
 /** Secondes de partie avant l'action où le ralenti commence (les joueurs convergent). */
 const BEFORE: Record<MayhemEvent["kind"], number> = { firstblood: 9, kill: 8, skirmish: 12, teamfight: 20, dragon: 14, herald: 10, baron: 20, tower: 6, inhib: 8, nexus: 14 };
 /** Secondes de partie gardées au ralenti après l'action, puis rampe vers l'avance rapide. */
@@ -33,7 +35,7 @@ const killsOf = (e: MayhemEvent) => e.ks?.length ?? e.ka + e.kb;
 const weightOf = (e: MayhemEvent) => killsOf(e) + (e.kind === "baron" || e.kind === "nexus" ? 3 : e.kind === "teamfight" ? 2 : e.kind === "dragon" || e.kind === "herald" ? 1 : 0);
 const slowOf = (e: MayhemEvent) => {
   const k = killsOf(e);
-  return Math.min(PACE[e.kind], k >= 4 ? 2 : k >= 2 ? 3 : k === 1 ? 4.5 : PACE[e.kind]);
+  return Math.min(PACE[e.kind], k >= 4 ? 1.2 : k >= 2 ? 1.8 : k === 1 ? 2.5 : PACE[e.kind]);
 };
 const BLUE = "#3B82F6";
 const RED = "#E5484D";
@@ -102,13 +104,16 @@ export function Broadcast({
   const pace = useMemo(() => {
     const n = Math.ceil(game.duration) + 2;
     const out = new Array<number>(n).fill(FAST);
+    const lerp = (lo: number, hi: number, d: number) => Math.exp(Math.log(lo) + (Math.log(hi) - Math.log(lo)) * Math.min(1, Math.max(0, d)));
     for (const e of game.events) {
       const slow = slowOf(e);
-      const a = e.t - BEFORE[e.kind];
+      // Approche (les joueurs convergent) un peu ralentie, puis l'instant de l'action au plus lent
+      const approach = Math.min(FAST, slow * 3);
+      const a = e.t - Math.max(BEFORE[e.kind], CLIMAX + 2);
+      const c = e.t - CLIMAX;
       const b = e.t + AFTER;
       for (let s = Math.max(0, Math.floor(a - RAMP)); s <= Math.min(n - 1, Math.ceil(b + RAMP)); s++) {
-        const d = Math.min(1, s < a ? (a - s) / RAMP : s > b ? (s - b) / RAMP : 0);
-        const v = Math.exp(Math.log(slow) + (Math.log(FAST) - Math.log(slow)) * d);
+        const v = s < a ? lerp(approach, FAST, (a - s) / RAMP) : s < c ? lerp(slow, approach, (c - s) / 3) : s <= b ? slow : lerp(slow, FAST, (s - b) / RAMP);
         if (v < out[s]) out[s] = v;
       }
     }
@@ -119,6 +124,8 @@ export function Broadcast({
     return pace[i] + (pace[i + 1] - pace[i]) * clamp(at - i, 0, 1);
   };
   const rate = speed === "auto" ? paceAt(time) : speed;
+  /** Ralenti marqué (badge rouge, bords assombris). */
+  const slowMo = speed === "auto" && rate <= 3.2;
 
   useEffect(() => {
     if (paused || ended) return;
@@ -157,7 +164,8 @@ export function Broadcast({
   for (const e of game.events) if (time >= e.t - BEFORE[e.kind] && time <= e.t + AFTER && (!action || weightOf(e) > weightOf(action))) action = e;
   const fight = action && weightOf(action) >= BIG && !ended ? action : null;
   // Caméra : centrée sur un gros combat (approche comprise), sinon toute la carte
-  const CAM_K = 1.7;
+  // Plus serré au moment du combat qu'à l'approche
+  const CAM_K = fight && time >= fight.t - CLIMAX ? 2.1 : 1.7;
   const cam = !camAuto ? view : fight ? { k: CAM_K, x: clamp(50 - fight.at[0] * CAM_K, 100 - 100 * CAM_K, 0), y: clamp(50 - fight.at[1] * CAM_K, 100 - 100 * CAM_K, 0) } : { k: 1, x: 0, y: 0 };
   const inv = (1 / cam.k).toFixed(3);
 
@@ -418,7 +426,26 @@ export function Broadcast({
               </div>
 
               {/* Ralenti : bords assombris pendant une grosse action ; flash sur un ace, le Baron, le Nexus */}
-              <span className="absolute inset-0 z-[5] pointer-events-none" style={{ boxShadow: "inset 0 0 90px 10px rgba(0,0,0,.75)", opacity: !ended && rate <= 3.2 ? 1 : 0, transition: "opacity .6s ease" }} />
+              <span className="absolute inset-0 z-[5] pointer-events-none" style={{ boxShadow: "inset 0 0 110px 18px rgba(0,0,0,.8)", opacity: !ended && slowMo ? 1 : 0, transition: "opacity .5s ease" }} />
+              {/* Rythme automatique : posé sur la carte, la barre de lecture ne bouge pas */}
+              {!ended && speed === "auto" && (
+                <span className="absolute right-14 top-3 z-10 flex items-center gap-1.5 h-8 px-3 cut-sm font-d font-bold text-[13px] tracking-[0.08em] uppercase whitespace-nowrap" style={{ background: slowMo ? "var(--danger)" : "rgba(15,17,21,.84)", color: slowMo ? "#FFFFFF" : "#EEF0F3", transition: "background .3s ease" }} aria-hidden="true">
+                  {slowMo ? (
+                    <>
+                      <span className="live" style={{ width: 8, height: 8, background: "#FFFFFF" }} />
+                      {t("Ralenti")}
+                    </>
+                  ) : (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M4 6v12l8-6zM12 6v12l8-6z" />
+                      </svg>
+                      {t("Avance rapide")}
+                    </>
+                  )}
+                  <span className="opacity-75">×{rate < 3 ? rate.toFixed(1).replace(".", ",") : Math.round(rate)}</span>
+                </span>
+              )}
               {effects.flash && !ended && <span key={"f" + effects.flash} className="mm-flash absolute inset-0 z-[6] pointer-events-none bg-white" />}
               {!ended && feed.length > 0 && (
                 <ol aria-label={t("Éliminations")} className="absolute right-3 bottom-3 z-10 m-0 p-0 list-none flex flex-col items-end gap-1">
@@ -509,24 +536,6 @@ export function Broadcast({
             <span className="font-d font-bold text-[28px] leading-none">
               {mmss(time)} <span className="text-base text-mut">/ {mmss(game.duration)}</span>
             </span>
-            {!ended && speed === "auto" && (
-              <span className="flex items-center gap-1.5 w-[150px] h-8 px-3 cut-sm font-d font-bold text-xs tracking-[0.08em] uppercase" style={{ background: rate <= 6 ? "color-mix(in srgb, var(--danger) 16%, var(--surf))" : "var(--surf)", color: rate <= 6 ? "var(--danger)" : "var(--ink)" }} aria-hidden="true">
-                {rate <= 6 ? (
-                  <>
-                    <span className="live" style={{ width: 7, height: 7, background: "var(--danger)" }} />
-                    {t("Ralenti")}
-                  </>
-                ) : (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M4 6v12l8-6zM12 6v12l8-6z" />
-                    </svg>
-                    {t("Avance rapide")}
-                  </>
-                )}
-                <span className="ml-auto text-mut">×{Math.round(rate)}</span>
-              </span>
-            )}
             <div role="radiogroup" aria-label={t("Vitesse")} className="flex">
               {SPEEDS.map((s) => (
                 <button key={s} type="button" role="radio" aria-checked={speed === s} onClick={() => setSpeed(s)} title={s === "auto" ? t("Accélère les temps morts, ralentit les actions") : undefined} className="min-w-12 h-11 px-2.5 border-0 cut-sm cursor-pointer font-d font-bold" style={{ background: speed === s ? "var(--acc)" : "var(--surf2)", color: speed === s ? "var(--on-acc)" : "var(--ink)" }}>
