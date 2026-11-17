@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { CHAMPION_BY_ID, ITEM_BY_ID } from "@loltr/content";
+import { CHAMPION_BY_ID, DEVINE_WORDS, ITEM_BY_ID } from "@loltr/content";
 import { DEVINE_TURNS } from "@loltr/shared";
 import { createJeuxApp } from "./app";
 import { createDb } from "./db";
-import { ENGINES } from "./games";
+import { ENGINES, PARTIES } from "./games";
 import { heatPoints } from "./games/chaudfroid";
 import { sudokuOfDay } from "./games/sudoku";
 
@@ -151,25 +151,43 @@ describe("jeux de groupe à plateau partagé", () => {
     expect((await call(`/rounds/${ids[spyB]}`, spyB)).body.over).toBe(true);
   });
 
-  test("Fais-moi deviner : mots interdits bloqués, mot trouvé par l'équipier", async () => {
-    const { call, advance } = setup(["u1", "u2"]);
+  test("Fais-moi deviner : seul le mot est interdit, points selon la vitesse, raccourcis acceptés", async () => {
+    const { call, advance } = setup(["u1", "u2", "u3"]);
     const ids: Record<string, string> = {};
-    for (const u of ["u1", "u2"]) ids[u] = (await call("/rounds", u, { game: "devine", context: "classique", sessionId: "g" })).body.id;
+    for (const u of ["u1", "u2", "u3"]) ids[u] = (await call("/rounds", u, { game: "devine", context: "classique", sessionId: "g" })).body.id;
     const v = (await call(`/party/${ids.u1}`, "u1")).body.view;
     const teller = v.turn.teller as string;
-    const guesser = teller === "u1" ? "u2" : "u1";
+    const [a, b] = ["u1", "u2", "u3"].filter((u) => u !== teller);
     const tv = (await call(`/party/${ids[teller]}`, teller)).body.view;
-    expect((await call(`/party/${ids[guesser]}`, guesser)).body.view.word).toBeNull();
-    expect((await call(`/party/${ids[teller]}/act`, teller, { type: "clue", text: "un indice avec " + tv.word.fr.banned[0] })).body.error).toBe("banned_word");
-    const found = (await call(`/party/${ids[guesser]}/act`, guesser, { type: "guess", text: tv.word.fr.word })).body.view;
-    expect(found.points[0]).toBe(1);
-    // Fin des tours (DEVINE_TURNS au moins) : les manches se closent avec le score de l'équipe
+    expect((await call(`/party/${ids[a]}`, a)).body.view.word).toBeNull();
+    // Le mot lui-même est bloqué, un mot voisin passe
+    expect((await call(`/party/${ids[teller]}/act`, teller, { type: "clue", text: "c'est " + tv.word.fr })).body.error).toBe("banned_word");
+    expect((await call(`/party/${ids[teller]}/act`, teller, { type: "clue", text: "un indice permis" })).status).toBe(200);
+    // Trouvé tôt : plus de points que trouvé tard ; le conteur marque pour chacun
+    const fast = (await call(`/party/${ids[a]}/act`, a, { type: "guess", text: tv.word.en })).body.view;
+    expect(fast.points[a]).toBeGreaterThan(250);
+    expect(fast.points[teller]).toBe(100);
+    advance(50_000);
+    const slow = (await call(`/party/${ids[b]}/act`, b, { type: "guess", text: tv.word.fr })).body.view;
+    expect(slow.points[b]).toBeLessThan(fast.points[a]);
+    // Tout le monde a trouvé : tour suivant, avec un autre conteur
+    expect(slow.turn.n).toBe(2);
+    expect(slow.turn.teller).not.toBe(teller);
+    // Fin des tours : les manches se closent avec les points de chacun
     let last = (await call(`/party/${ids.u1}`, "u1")).body;
-    for (let i = 0; i < DEVINE_TURNS && !last.view.over; i++) {
+    for (let i = 0; i < 10 && !last.view.over; i++) {
       advance(61_000);
       last = (await call(`/party/${ids.u1}`, "u1")).body;
     }
     expect(last.view.over).toBe(true);
     expect(last.round.over).toBe(true);
+  });
+
+  test("Fais-moi deviner : « ff » trouve Abandon", () => {
+    const party = PARTIES.devine!;
+    let s = party.create("x", ["u1", "u2"], 0);
+    s = { ...s, words: [DEVINE_WORDS.findIndex((x) => x.fr === "Abandon")], w: 0 };
+    const guesser = s.players.find((p: string) => p !== s.turns[0]);
+    expect(party.act(s, guesser, { type: "guess", text: "ff" }, 1000).points[guesser]).toBeGreaterThan(0);
   });
 });

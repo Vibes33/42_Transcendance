@@ -1,5 +1,5 @@
 import { CODENAMES_TURN_MS, DEVINE_TURNS, DEVINE_TURN_MS, matchName, rng, shuffle, type GameKey } from "@loltr/shared";
-import { CODENAMES_WORDS, DEVINE_WORDS, type Lang } from "@loltr/content";
+import { CODENAMES_WORDS, DEVINE_WORDS, type DevineWord, type Lang } from "@loltr/content";
 import { GameError, type GameEngine } from "./engine";
 
 // Jeux de groupe à plateau partagé : Codenames de la Faille et Fais-moi deviner. Tout le groupe
@@ -137,20 +137,45 @@ function endTurn(s: CodenamesState, now: number): CodenamesState {
 }
 
 // --- Fais-moi deviner ------------------------------------------------------------------
+// Comme skribbl.io : tout le groupe joue ensemble. À chaque tour, un joueur (le conteur) décrit un
+// mot sans le dire ; les autres le cherchent. Plus on trouve vite, plus on marque ; le conteur marque
+// pour chaque joueur qui trouve. Le tour finit quand tout le monde a trouvé ou au bout du chrono.
+
+/** Points d'un joueur qui trouve : de 300 (tout de suite) à 100 (à la dernière seconde). */
+export const devineFinderPoints = (leftMs: number) => 100 + Math.round((200 * Math.max(0, Math.min(DEVINE_TURN_MS, leftMs))) / DEVINE_TURN_MS);
+/** Points du conteur pour chaque joueur qui trouve : 200 répartis entre ceux qui cherchent. */
+export const devineTellerPoints = (guessers: number) => Math.round(200 / Math.max(1, guessers));
+
+type FeedKind = "clue" | "guess" | "found" | "skip" | "reveal";
 
 export interface DevineState {
-  /** Équipes de deux (une équipe de trois si le groupe est impair). */
-  teams: string[][];
-  points: number[];
-  /** Ordre des tours : [équipe, joueur qui fait deviner]. */
-  turns: [number, string][];
+  players: string[];
+  points: Record<string, number>;
+  /** Conteur de chaque tour. */
+  turns: string[];
   t: number;
   words: number[];
   w: number;
   turnEndsAt: number;
-  feed: { by: string; text: string; kind: "clue" | "guess" | "found" | "skip" }[];
-  found: string[];
+  /** Joueurs qui ont trouvé le mot du tour, dans l'ordre. */
+  foundBy: string[];
+  /** Messages du tour ; « reveal » donne le mot du tour précédent (index dans DEVINE_WORDS). */
+  feed: { by: string; text: string; kind: FeedKind; word?: number; points?: number }[];
+  /** Tours où le mot a été trouvé par au moins un joueur. */
+  wordsFound: number;
   endedAt: number | null;
+}
+
+const devineWord = (s: DevineState) => DEVINE_WORDS[s.words[s.w % s.words.length]];
+const answers = (x: DevineWord) => [x.fr, x.en, ...(x.alias ?? [])];
+
+/** Passe au tour suivant (le mot du tour fini est dévoilé dans le fil), ou termine la partie. */
+function nextDevineTurn(s: DevineState, now: number): DevineState {
+  const reveal = { by: s.turns[s.t], text: "", kind: "reveal" as const, word: s.words[s.w % s.words.length] };
+  const wordsFound = s.wordsFound + (s.foundBy.length ? 1 : 0);
+  const t = s.t + 1;
+  if (t >= s.turns.length) return { ...s, wordsFound, feed: [...s.feed, reveal], endedAt: now };
+  return { ...s, t, w: s.w + 1, wordsFound, foundBy: [], turnEndsAt: now + DEVINE_TURN_MS, feed: [reveal] };
 }
 
 export const devineParty: PartyGame<DevineState> = {
@@ -158,76 +183,86 @@ export const devineParty: PartyGame<DevineState> = {
   minPlayers: 2,
   create(seed, members, now) {
     const r = rng(seed + ":devine");
-    const order = shuffle(members, r);
-    const teams: string[][] = [];
-    for (let i = 0; i < order.length; i += 2) teams.push(order.slice(i, i + 2));
-    if (teams.length > 1 && teams[teams.length - 1].length === 1) teams[teams.length - 2].push(teams.pop()![0]);
-    // Les équipes alternent et chacun fait deviner à son tour, sur DEVINE_TURNS tours au moins
-    const turns: [number, string][] = [];
-    const most = Math.max(...teams.map((t) => t.length));
-    while (turns.length < Math.max(DEVINE_TURNS, members.length)) for (let k = 0; k < most; k++) teams.forEach((t, ti) => t[k] && turns.push([ti, t[k]]));
+    const players = shuffle(members, r);
+    // Chacun fait deviner à son tour, sur DEVINE_TURNS tours au moins
+    const turns: string[] = [];
+    while (turns.length < Math.max(DEVINE_TURNS, players.length)) turns.push(...players);
     const words = shuffle([...DEVINE_WORDS.keys()], r);
-    return { teams, points: teams.map(() => 0), turns, t: 0, words, w: 0, turnEndsAt: now + DEVINE_TURN_MS, feed: [], found: [], endedAt: null };
+    return { players, points: Object.fromEntries(players.map((p) => [p, 0])), turns, t: 0, words, w: 0, turnEndsAt: now + DEVINE_TURN_MS, foundBy: [], feed: [], wordsFound: 0, endedAt: null };
   },
   view(s, userId, now) {
-    const [team, teller] = s.turns[s.t] ?? [0, ""];
-    const mine = s.teams.findIndex((t) => t.includes(userId));
-    const role = s.endedAt ? "fin" : userId === teller ? "conteur" : mine === team ? "devin" : "spectateur";
-    const word = DEVINE_WORDS[s.words[s.w % s.words.length]];
-    // Celui qui devine ne voit que la longueur du mot ; les autres le voient
+    const teller = s.turns[s.t] ?? "";
+    const found = s.foundBy.includes(userId);
+    const role = s.endedAt ? "fin" : userId === teller ? "conteur" : found ? "trouve" : s.players.includes(userId) ? "devin" : "spectateur";
+    const word = devineWord(s);
+    const mask = (x: string) => x.replace(/[^\s'-]/g, "_");
     return {
-      teams: s.teams,
+      players: s.players,
       points: s.points,
-      turn: { n: s.t + 1, total: s.turns.length, team, teller },
+      turn: { n: s.t + 1, total: s.turns.length, teller },
       role,
-      word: role === "devin" ? null : word,
-      mask: { fr: word.fr.word.replace(/[^\s'-]/g, "_"), en: word.en.word.replace(/[^\s'-]/g, "_") },
+      // Le mot est visible du conteur, de ceux qui l'ont trouvé et à la fin
+      word: role === "devin" || role === "spectateur" ? null : { fr: word.fr, en: word.en },
+      mask: { fr: mask(word.fr), en: mask(word.en) },
       turnEndsAt: s.turnEndsAt,
-      feed: s.feed.slice(-14),
-      found: s.found,
+      foundBy: s.foundBy,
+      feed: s.feed.slice(-80).map((e) => (e.word !== undefined ? { ...e, reveal: { fr: DEVINE_WORDS[e.word].fr, en: DEVINE_WORDS[e.word].en } } : e)),
+      wordsFound: s.wordsFound,
       over: s.endedAt !== null,
       now
     };
   },
   act(s, userId, action, now) {
     if (s.endedAt) throw new GameError("round_over", "La partie est terminée.");
-    const [team, teller] = s.turns[s.t];
-    const word = DEVINE_WORDS[s.words[s.w % s.words.length]];
+    const teller = s.turns[s.t];
+    const word = devineWord(s);
     const text = String(action.text ?? "").trim().slice(0, 120);
     if (action.type === "clue" || action.type === "skip") {
       if (userId !== teller) throw new GameError("not_your_turn", "Ce n'est pas à toi de faire deviner.");
-      // Passer coûte un point, même à 0 (le score affiché ne descend pas sous 0)
-      if (action.type === "skip") return { ...s, w: s.w + 1, points: s.points.map((p, i) => (i === team ? p - 1 : p)), feed: [...s.feed, { by: userId, text: "", kind: "skip" }] };
+      // Passer : un autre mot, sans points (on ne peut plus passer une fois qu'un joueur a trouvé)
+      if (action.type === "skip") {
+        if (s.foundBy.length) throw new GameError("skip_late", "Quelqu’un a déjà trouvé ce mot.");
+        return { ...s, w: s.w + 1, feed: [...s.feed, { by: userId, text: "", kind: "skip" }] };
+      }
       if (!text) throw new GameError("empty");
-      // Mots interdits et mot à deviner bloqués, dans les deux langues
-      const tokens = norm(text).split(/\s+/);
-      const banned = [...word.fr.banned, ...word.en.banned, ...word.fr.word.split(/\s+/), ...word.en.word.split(/\s+/)].map(norm).filter((x) => x.length > 1);
-      const hit = banned.find((b) => (b.includes(" ") ? norm(text).includes(b) : tokens.includes(b)));
-      if (hit) throw new GameError("banned_word", "Mot interdit dans ton indice.");
+      // Seul le mot à faire deviner (et ses raccourcis) est interdit, dans les deux langues
+      const said = ` ${norm(text)} `;
+      const banned = answers(word).map(norm).filter((x) => x.length > 0);
+      if (banned.some((b) => said.includes(` ${b} `) || (b.length > 3 && said.replace(/ /g, "").includes(b.replace(/ /g, ""))))) throw new GameError("banned_word", "Tu ne peux pas écrire le mot à faire deviner.");
       return { ...s, feed: [...s.feed, { by: userId, text, kind: "clue" }] };
     }
     if (action.type !== "guess") throw new GameError("bad_action");
-    if (!s.teams[team].includes(userId) || userId === teller) throw new GameError("not_your_turn", "Seul ton équipier peut deviner.");
+    if (userId === teller) throw new GameError("not_your_turn", "C’est toi qui fais deviner.");
+    if (!s.players.includes(userId)) throw new GameError("not_your_turn", "Tu regardes cette partie.");
+    if (s.foundBy.includes(userId)) throw new GameError("already_found", "Tu as déjà trouvé.");
     if (!text) throw new GameError("empty");
-    const ok = [word.fr.word, word.en.word].some((x) => matchName(text, [{ id: "w", names: [x] }]));
+    const ok = answers(word).some((x) => matchName(text, [{ id: "w", names: [x] }]));
     if (!ok) return { ...s, feed: [...s.feed, { by: userId, text, kind: "guess" }] };
-    return { ...s, w: s.w + 1, points: s.points.map((p, i) => (i === team ? p + 1 : p)), found: [...s.found, word.fr.word], feed: [...s.feed, { by: userId, text, kind: "found" }] };
+    const gain = devineFinderPoints(s.turnEndsAt - now);
+    const bonus = devineTellerPoints(s.players.length - 1);
+    const points = { ...s.points, [userId]: (s.points[userId] ?? 0) + gain, [teller]: (s.points[teller] ?? 0) + bonus };
+    const next: DevineState = { ...s, points, foundBy: [...s.foundBy, userId], feed: [...s.feed, { by: userId, text: "", kind: "found", points: gain }] };
+    // Tout le monde a trouvé : tour suivant tout de suite
+    return next.foundBy.length >= s.players.length - 1 ? nextDevineTurn(next, now) : next;
   },
   tick(s, now, present) {
     if (s.endedAt) return s;
-    // Celui qui fait deviner est parti : on passe au tour suivant
-    const gone = present && !present.includes(s.turns[s.t]?.[1]);
-    if (!gone && now <= s.turnEndsAt) return s;
-    const t = s.t + 1;
-    if (t >= s.turns.length) return { ...s, endedAt: now };
-    return { ...s, t, w: s.w + 1, turnEndsAt: now + DEVINE_TURN_MS, feed: [] };
+    const teller = s.turns[s.t];
+    if (present) {
+      // Moins de deux joueurs encore là : la partie s'arrête
+      if (s.players.filter((p) => present.includes(p)).length < 2) return { ...s, endedAt: now };
+      // Conteur parti : tour suivant ; tous ceux qui restent ont trouvé : tour suivant
+      if (!present.includes(teller)) return nextDevineTurn(s, now);
+      const seekers = s.players.filter((p) => p !== teller && present.includes(p));
+      if (seekers.length && seekers.every((p) => s.foundBy.includes(p))) return nextDevineTurn(s, now);
+    }
+    return now > s.turnEndsAt ? nextDevineTurn(s, now) : s;
   },
   isOver(s) {
     return s.endedAt !== null;
   },
   scoreOf(s, userId) {
-    const i = s.teams.findIndex((t) => t.includes(userId));
-    return i >= 0 ? Math.max(0, s.points[i]) * 100 : 0;
+    return s.points[userId] ?? 0;
   }
 };
 

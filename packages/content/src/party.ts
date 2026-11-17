@@ -23,38 +23,64 @@ export const CODENAMES_WORDS: T[] = [
   w("Reine", "Queen"), w("Pirate", "Pirate"), w("Ninja", "Ninja"), w("Robot", "Robot"), w("Champignon", "Mushroom")
 ];
 
-/** Fais-moi deviner : mot à faire trouver et mots interdits, dans chaque langue. */
-export const DEVINE_WORDS: Record<Lang, { word: string; banned: string[] }>[] = [
-  { fr: { word: "Baron Nashor", banned: ["Baron", "Nashor", "Fosse", "Violet", "Buff"] }, en: { word: "Baron Nashor", banned: ["Baron", "Nashor", "Pit", "Purple", "Buff"] } },
-  { fr: { word: "Dragon ancestral", banned: ["Dragon", "Ancestral", "Ancien", "Exécution", "Fosse"] }, en: { word: "Elder Dragon", banned: ["Dragon", "Elder", "Old", "Execute", "Pit"] } },
-  { fr: { word: "Pentakill", banned: ["Penta", "Cinq", "Kill", "Tuer", "Équipe"] }, en: { word: "Pentakill", banned: ["Penta", "Five", "Kill", "Team", "Ace"] } },
-  { fr: { word: "Balise de contrôle", banned: ["Balise", "Contrôle", "Ward", "Vision", "Rose"] }, en: { word: "Control Ward", banned: ["Ward", "Control", "Pink", "Vision", "Place"] } },
-  { fr: { word: "Faker", banned: ["T1", "Corée", "Mid", "Démon", "Worlds"] }, en: { word: "Faker", banned: ["T1", "Korea", "Mid", "Demon", "Worlds"] } },
-  { fr: { word: "Poro", banned: ["Freljord", "Blanc", "Mignon", "Biscuit", "Abîme"] }, en: { word: "Poro", banned: ["Freljord", "White", "Cute", "Snack", "Abyss"] } },
-  { fr: { word: "Flash", banned: ["Sort", "Invocateur", "Téléporter", "Éclair", "F"] }, en: { word: "Flash", banned: ["Summoner", "Spell", "Teleport", "Blink", "F"] } },
-  { fr: { word: "Tourelle", banned: ["Tour", "Détruire", "Sbire", "Plaque", "Lane"] }, en: { word: "Turret", banned: ["Tower", "Destroy", "Minion", "Plate", "Lane"] } },
-  { fr: { word: "Nexus", banned: ["Base", "Détruire", "Victoire", "Cristal", "Fin"] }, en: { word: "Nexus", banned: ["Base", "Destroy", "Victory", "Crystal", "End"] } },
-  { fr: { word: "Jinx", banned: ["Arcane", "Zaun", "Vi", "Roquette", "Bleu"] }, en: { word: "Jinx", banned: ["Arcane", "Zaun", "Vi", "Rocket", "Blue"] } },
-  { fr: { word: "Teemo", banned: ["Champignon", "Yordle", "Bandle", "Scout", "Cécité"] }, en: { word: "Teemo", banned: ["Mushroom", "Yordle", "Bandle", "Scout", "Blind"] } },
-  { fr: { word: "Gank", banned: ["Jungle", "Jungler", "Lane", "Surprise", "Attaquer"] }, en: { word: "Gank", banned: ["Jungle", "Jungler", "Lane", "Surprise", "Attack"] } },
-  { fr: { word: "Buisson", banned: ["Herbe", "Cacher", "Vision", "Embuscade", "Vert"] }, en: { word: "Brush", banned: ["Bush", "Grass", "Hide", "Vision", "Ambush"] } },
-  { fr: { word: "Héraut de la Faille", banned: ["Héraut", "Faille", "Œil", "Tour", "Monstre"] }, en: { word: "Rift Herald", banned: ["Herald", "Rift", "Eye", "Tower", "Monster"] } },
-  { fr: { word: "Worlds", banned: ["Championnat", "Monde", "Coupe", "Esport", "Finale"] }, en: { word: "Worlds", banned: ["Championship", "World", "Cup", "Esports", "Final"] } },
-  { fr: { word: "Lame d'infini", banned: ["Lame", "Infini", "Critique", "Épée", "Objet"] }, en: { word: "Infinity Edge", banned: ["Edge", "Infinity", "Critical", "Sword", "Item"] } },
-  { fr: { word: "Sablier de Zhonya", banned: ["Sablier", "Zhonya", "Or", "Stase", "Temps"] }, en: { word: "Zhonya's Hourglass", banned: ["Hourglass", "Zhonya", "Gold", "Stasis", "Time"] } },
-  { fr: { word: "Sbire", banned: ["Vague", "Farm", "Lane", "Or", "Creep"] }, en: { word: "Minion", banned: ["Wave", "Farm", "Lane", "Gold", "Creep"] } },
-  { fr: { word: "Yasuo", banned: ["Vent", "Mur", "Ionia", "Yone", "Épée"] }, en: { word: "Yasuo", banned: ["Wind", "Wall", "Ionia", "Yone", "Sword"] } },
-  { fr: { word: "Ahri", banned: ["Renard", "Queues", "Charme", "Ionia", "Vastaya"] }, en: { word: "Ahri", banned: ["Fox", "Tails", "Charm", "Ionia", "Vastaya"] } },
-  { fr: { word: "Rappel", banned: ["Base", "Retour", "B", "Fontaine", "Téléporter"] }, en: { word: "Recall", banned: ["Base", "Back", "B", "Fountain", "Teleport"] } },
-  { fr: { word: "Châtiment", banned: ["Jungle", "Sort", "Monstre", "Voler", "Smite"] }, en: { word: "Smite", banned: ["Jungle", "Spell", "Monster", "Steal", "Summoner"] } },
-  { fr: { word: "Arcane", banned: ["Série", "Netflix", "Vi", "Jinx", "Animation"] }, en: { word: "Arcane", banned: ["Series", "Netflix", "Vi", "Jinx", "Animation"] } },
-  { fr: { word: "Piltover", banned: ["Ville", "Progrès", "Caitlyn", "Hextech", "Zaun"] }, en: { word: "Piltover", banned: ["City", "Progress", "Caitlyn", "Hextech", "Zaun"] } },
-  { fr: { word: "Carapateur", banned: ["Crabe", "Rivière", "Vision", "Jungle", "Faille"] }, en: { word: "Rift Scuttler", banned: ["Crab", "River", "Vision", "Jungle", "Scuttle"] } },
-  { fr: { word: "Inhibiteur", banned: ["Super", "Sbire", "Base", "Détruire", "Réapparaît"] }, en: { word: "Inhibitor", banned: ["Super", "Minion", "Base", "Destroy", "Respawn"] } },
-  { fr: { word: "Abandon", banned: ["Surrender", "FF", "Vote", "Quinze", "Perdre"] }, en: { word: "Surrender", banned: ["Give up", "FF", "Vote", "Fifteen", "Lose"] } },
-  { fr: { word: "Thresh", banned: ["Lanterne", "Crochet", "Support", "Îles obscures", "Âmes"] }, en: { word: "Thresh", banned: ["Lantern", "Hook", "Support", "Shadow Isles", "Souls"] } },
-  { fr: { word: "Bouclier", banned: ["Protéger", "Absorber", "Dégâts", "Support", "Barrière"] }, en: { word: "Shield", banned: ["Protect", "Absorb", "Damage", "Support", "Barrier"] } },
-  { fr: { word: "Lee Sin", banned: ["Moine", "Aveugle", "Coup de pied", "Jungle", "Insec"] }, en: { word: "Lee Sin", banned: ["Monk", "Blind", "Kick", "Jungle", "Insec"] } }
+/**
+ * Fais-moi deviner : mot à faire trouver dans chaque langue, et raccourcis acceptés comme réponse
+ * (« ff » pour Abandon). Seuls ces mots-là sont interdits dans les indices du conteur.
+ */
+export interface DevineWord {
+  fr: string;
+  en: string;
+  alias?: string[];
+}
+const d = (fr: string, en: string, alias?: string[]): DevineWord => (alias ? { fr, en, alias } : { fr, en });
+const c = (name: string, alias?: string[]) => d(name, name, alias);
+
+export const DEVINE_WORDS: DevineWord[] = [
+  // Champions
+  c("Ahri"), c("Akali"), c("Ashe"), c("Annie"), c("Blitzcrank", ["blitz"]), c("Brand"), c("Braum"), c("Caitlyn", ["cait"]),
+  c("Darius"), c("Draven"), c("Ekko"), c("Ezreal", ["ez"]), c("Fiora"), c("Garen"), c("Graves"), c("Heimerdinger", ["heimer", "donger"]),
+  c("Irelia"), c("Janna"), c("Jax"), c("Jhin"), c("Jinx"), c("Kai'Sa", ["kaisa"]), c("Karthus"), c("Katarina", ["kata"]),
+  c("Kayle"), c("Kindred"), c("Lee Sin", ["lee"]), c("Leona"), c("Lulu"), c("Lux"), c("Malphite", ["malph"]), c("Master Yi", ["yi"]),
+  c("Miss Fortune", ["mf"]), c("Morgana", ["morg"]), c("Nami"), c("Nasus"), c("Pyke"), c("Rammus"), c("Riven"), c("Sett"),
+  c("Shaco"), c("Singed"), c("Sona"), c("Soraka", ["raka"]), c("Thresh"), c("Tristana", ["trist"]), c("Twisted Fate", ["tf"]), c("Twitch"),
+  c("Veigar"), c("Vi"), c("Viego"), c("Volibear", ["voli"]), c("Warwick", ["ww"]), c("Xayah"), c("Yasuo"), c("Yone"),
+  c("Yuumi"), c("Zed"), c("Ziggs"), c("Zoe"), c("Mordekaiser", ["morde"]), c("Nautilus", ["naut"]), c("Kha'Zix", ["khazix", "kha"]), c("Kog'Maw", ["kogmaw", "kog"]),
+  c("Cho'Gath", ["chogath", "cho"]), c("Dr. Mundo", ["mundo"]), c("Jarvan IV", ["jarvan", "j4"]), c("Aurelion Sol", ["asol"]), c("Gragas"), c("Hecarim", ["heca"]), c("Rengar"), c("Senna"),
+  c("Lucian"), c("Samira"), c("Aphelios"), c("Vayne"), c("Kassadin", ["kass"]), c("Kennen"), c("Gnar"), c("Rumble"),
+  c("Ornn"), c("Bard"), c("Taric"), c("Zilean", ["zil"]), c("Galio"), c("Orianna", ["ori"]), c("Syndra"), c("Viktor"),
+  c("Azir"), c("Sylas"), c("Qiyana"), c("Aatrox"), c("Illaoi"), c("Kled"), c("Camille"), c("Teemo"),
+  // Carte et objectifs
+  d("Baron Nashor", "Baron Nashor", ["baron", "nashor"]), d("Dragon ancestral", "Elder Dragon", ["elder"]), d("Héraut de la Faille", "Rift Herald", ["herald", "héraut"]),
+  d("Larves du Néant", "Voidgrubs", ["grubs", "larves"]), c("Atakhan"), d("Carapateur", "Rift Scuttler", ["scuttle", "crabe", "crab"]),
+  d("Tourelle", "Turret", ["tour", "tower"]), d("Inhibiteur", "Inhibitor", ["inhib"]), c("Nexus"), d("Fontaine", "Fountain"),
+  d("Buisson", "Brush", ["bush"]), d("Rivière", "River"), d("Buff bleu", "Blue buff", ["bleu", "blue"]), d("Buff rouge", "Red buff", ["rouge", "red"]),
+  c("Gromp"), c("Krugs"), d("Raptors", "Raptors"), d("Loups", "Murk Wolves", ["wolves"]), d("Âme de dragon", "Dragon Soul", ["soul", "âme"]),
+  d("Dragon infernal", "Infernal Drake", ["infernal"]), d("Dragon océan", "Ocean Drake", ["ocean", "océan"]), d("Faille de l'invocateur", "Summoner's Rift", ["sr", "faille"]),
+  d("Abîme hurlant", "Howling Abyss", ["abyss", "abîme"]), d("ARAM", "ARAM"), d("Sbire", "Minion"), d("Sbire canon", "Cannon minion", ["canon", "cannon"]),
+  d("Vague de sbires", "Minion wave", ["wave", "vague"]), d("Plaque de tourelle", "Turret plating", ["plaque", "plates", "plating"]),
+  // Objets
+  d("Lame d'infini", "Infinity Edge", ["ie"]), d("Sablier de Zhonya", "Zhonya's Hourglass", ["zhonya", "zhonyas"]), d("Coiffe de Rabadon", "Rabadon's Deathcap", ["rabadon", "deathcap"]),
+  d("Lame du roi déchu", "Blade of the Ruined King", ["botrk"]), d("Force de la Trinité", "Trinity Force", ["triforce", "trinity"]), d("Ange gardien", "Guardian Angel", ["ga"]),
+  d("Épée de Doran", "Doran's Blade", ["doran"]), d("Balise de contrôle", "Control Ward", ["pink", "pink ward", "balise rose", "control"]), d("Potion de soin", "Health Potion", ["potion", "pot"]),
+  d("Sceptre de cristal de Rylai", "Rylai's Crystal Scepter", ["rylai", "rylais"]), d("Couperet noir", "Black Cleaver", ["cleaver"]), d("Coques en acier", "Plated Steelcaps", ["tabi", "steelcaps"]),
+  d("Larme de la déesse", "Tear of the Goddess", ["tear", "larme"]), d("Soif-de-sang", "Bloodthirster", ["bt"]), d("Gage de Sterak", "Sterak's Gage", ["sterak"]),
+  d("Bottes", "Boots"), d("Or", "Gold", ["gold", "golds"]), d("Boutique", "Shop"),
+  // Sorts d'invocateur
+  c("Flash"), d("Téléportation", "Teleport", ["tp"]), d("Châtiment", "Smite"), d("Embrasement", "Ignite"), d("Fantôme", "Ghost"),
+  d("Soins", "Heal"), d("Purge", "Cleanse"), d("Barrière", "Barrier"), d("Épuisement", "Exhaust", ["exh"]),
+  // Jeu et jargon
+  d("Abandon", "Surrender", ["ff", "ff15", "ff 15", "forfeit", "go next"]), d("Rappel", "Recall", ["b", "back"]), c("Gank"), c("Farm"),
+  d("Pentakill", "Pentakill", ["penta"]), d("Quadrakill", "Quadrakill", ["quadra"]), d("Double kill", "Double kill", ["double"]), d("Premier sang", "First blood", ["fb", "first"]),
+  d("Ace", "Ace"), c("Shutdown"), c("Backdoor", ["bd"]), c("Split push", ["split"]), c("Teamfight"), c("Kite"), c("Peel"), c("Poke"),
+  c("Roam"), c("Invade"), c("Dive"), c("Freeze"), d("Last hit", "Last hit", ["lh"]), c("Smurf"), c("Tilt"), c("Carry"),
+  d("Toxique", "Toxic"), c("Feed", ["feeder", "int"]), d("AFK", "AFK"), c("Support", ["supp"]), c("ADC", ["ad carry", "marksman", "tireur"]), c("Jungler", ["jungle", "jgl"]),
+  d("Mid lane", "Mid lane", ["mid"]), d("Top lane", "Top lane", ["top"]), d("Bot lane", "Bot lane", ["bot", "botlane"]), d("Vision", "Vision"), c("Ward"), c("Skin"),
+  d("Ultime", "Ultimate", ["ult", "ulti", "r"]), d("Passif", "Passive"), d("Étourdissement", "Stun", ["stun"]), d("Bouclier", "Shield"), d("Coup critique", "Critical strike", ["crit", "critique"]),
+  c("Snowball"), c("Comeback"), d("Classée", "Ranked", ["ranked", "classé"]), c("Challenger", ["chall"]), d("Fer", "Iron"),
+  // Univers et esport
+  c("Worlds", ["championnat du monde"]), c("Faker"), c("T1"), c("MSI"), c("Arcane"), c("Piltover"), c("Zaun"), c("Demacia"),
+  c("Noxus"), c("Ionia"), c("Freljord"), c("Shurima"), c("Bilgewater"), d("Néant", "Void", ["void"]), d("Îles obscures", "Shadow Isles", ["shadow isles"]), c("Targon"),
+  c("Bandle"), c("Poro"), c("Yordle"), c("Vastaya"), c("Hextech"), d("Shimmer", "Shimmer", ["chimère"]), c("Darkin"), c("Runeterra")
 ];
 
 /** Questions d'esport du QCM : la bonne réponse est la première, l'ordre est mélangé à l'affichage. */
