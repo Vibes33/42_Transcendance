@@ -86,3 +86,6 @@ export const community = sqliteTable(
   { streamerId: text("streamer_id").notNull(), season: integer("season").notNull(), userId: text("user_id").notNull(), points: integer("points").notNull().default(0) },
   (t) => [primaryKey({ columns: [t.streamerId, t.season, t.userId] })]
 );
+
+/** Manches de stream déjà comptées pour la communauté (un événement rejoué ne compte pas deux fois). */
+export const communityRounds = sqliteTable("community_rounds", { roundId: text("round_id").primaryKey() });

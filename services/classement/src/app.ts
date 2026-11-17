@@ -4,7 +4,7 @@ import { addDays, dayKey, seasonOf, weekKey, type LeaderRow, type PublicPlayer, 
 import { callerPlugin, fail, health, internalGuard, requireAccount, requireSession, requireTester, type EventMap, type EventType } from "@loltr/shared/server";
 import type { Db } from "./db";
 import { community, days, inventory, ledger, results, streaks, wallets, weeks } from "./schema";
-import { balanceOf, credit, dailyUnlocksOf, history, ownedItems, periodPoints, projection, projectedTotal, rankOf, streakOf, type Period } from "./core";
+import { balanceOf, credit, dailyUnlocksOf, history, historyTotals, ownedItems, periodPoints, projection, projectedTotal, rankOf, resultsChanged, streakOf, type Period } from "./core";
 import { CATALOG, CATALOG_BY_ID, featuredPrestige, isKnownItem } from "./shop";
 
 export interface ClassementDeps {
@@ -19,15 +19,25 @@ export function createClassementApp(deps: ClassementDeps) {
   const { db } = deps;
   const now = deps.now ?? Date.now;
 
-  async function rows(ids: string[], points: Map<string, number>, season: number, today: string, global: Map<string, number>): Promise<LeaderRow[]> {
+  /**
+   * Lignes affichées d'un classement : les 100 premiers et l'appelant. Le rang est calculé sur tous
+   * les joueurs avant de filtrer (ex æquo au même rang, comme `rankOf`), et seuls les profils
+   * affichés sont demandés au service profil.
+   */
+  async function rows(ids: string[], points: Map<string, number>, season: number, today: string, global: Map<string, number>, meId: string | null) {
     const sorted = ids.filter((id) => (points.get(id) ?? 0) > 0).sort((a, b) => (points.get(b) ?? 0) - (points.get(a) ?? 0));
-    const profiles = Object.fromEntries((await deps.players(sorted)).map((p) => [p.userId, p]));
-    return sorted
-      .filter((id) => profiles[id])
-      .map((id, i) => {
-        const r = rankOf(db, id, season, now(), global);
-        return { ...profiles[id], rank: i + 1, points: points.get(id) ?? 0, tier: r.id, division: r.division, streak: streakOf(db, id, today).current };
-      });
+    const ranks: number[] = [];
+    sorted.forEach((id, i) => ranks.push(i > 0 && points.get(id) === points.get(sorted[i - 1]) ? ranks[i - 1] : i + 1));
+    const meIndex = meId ? sorted.indexOf(meId) : -1;
+    const shown = sorted.map((_, i) => i).filter((i) => i < 100 || i === meIndex);
+    const profiles = Object.fromEntries((await deps.players(shown.map((i) => sorted[i]))).map((p) => [p.userId, p]));
+    const line = (i: number): LeaderRow | null => {
+      const id = sorted[i];
+      if (!profiles[id]) return null;
+      const r = rankOf(db, id, season, now(), global);
+      return { ...profiles[id], rank: ranks[i], points: points.get(id) ?? 0, tier: r.id, division: r.division, streak: streakOf(db, id, today).current };
+    };
+    return { top: shown.filter((i) => i < 100).map(line).filter((r): r is LeaderRow => !!r), me: meIndex >= 0 ? line(meIndex) : null };
   }
 
   return new Elysia({ prefix: "/api/classement" })
@@ -56,7 +66,10 @@ export function createClassementApp(deps: ClassementDeps) {
       };
     })
     // Historique du défi du jour, jour par jour
-    .get("/history", ({ caller, query }) => ({ days: history(db, requireSession(caller), Math.min(Math.max(Number(query.limit) || 30, 1), 120)) }), {
+    .get("/history", ({ caller, query }) => {
+      const me = requireSession(caller);
+      return { days: history(db, me, Math.min(Math.max(Number(query.limit) || 30, 1), 120)), totals: historyTotals(db, me) };
+    }, {
       query: t.Object({ limit: t.Optional(t.String()) })
     })
     .get(
@@ -72,15 +85,14 @@ export function createClassementApp(deps: ClassementDeps) {
         }
         const pts = periodPoints(db, ids, period, now());
         const global = !ids && period === "saison" ? pts : periodPoints(db, null, "saison", now());
-        const list = await rows(ids ?? [...pts.keys()], pts, season.number, today, global);
         const meId = caller.kind === "user" ? caller.id : null;
-        const meRow = meId ? list.find((r) => r.userId === meId) ?? null : null;
+        const list = await rows(ids ?? [...pts.keys()], pts, season.number, today, global, meId);
         return {
           scope: query.scope,
           period,
           season: { number: season.number, endsAt: season.endsAt, progress: season.progress },
-          rows: list.slice(0, 100),
-          me: meRow,
+          rows: list.top,
+          me: list.me,
           myRank: meId ? rankOf(db, meId, season.number, now(), global) : null,
           friendsTotal: ids ? ids.length : null
         };
@@ -201,6 +213,7 @@ export function createClassementApp(deps: ClassementDeps) {
             tx.delete(results).where(and(eq(results.userId, me), eq(results.day, day))).run();
             tx.delete(days).where(and(eq(days.userId, me), eq(days.day, day))).run();
           });
+          resultsChanged(db);
           const balance = balanceOf(db, me);
           await deps.publish("wallet.updated", { userId: me, balance });
           return { balance };
@@ -221,10 +234,8 @@ export function createClassementApp(deps: ClassementDeps) {
           { body: t.Object({ userId: t.String(), item: t.String(), reason: t.String() }) }
         )
         .get("/projection/:userId/:day", ({ params }) => projection(db, params.userId, params.day))
-        .get(
-          "/projections",
-          ({ query }) => Object.fromEntries(query.ids.split(",").filter(Boolean).map((id) => [id, projection(db, id, query.day)])),
-          { query: t.Object({ ids: t.String(), day: t.String() }) }
-        )
+        .post("/projections", ({ body }) => Object.fromEntries(body.ids.map((id) => [id, projection(db, id, body.day)])), {
+          body: t.Object({ ids: t.Array(t.String()), day: t.String() })
+        })
     );
 }

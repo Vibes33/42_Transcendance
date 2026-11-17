@@ -9,6 +9,7 @@ import { useT } from "../i18n";
 import { avatarOf } from "../lib/chibi";
 import { CARD_BY_KEY } from "../lib/games";
 import { partieUrl } from "../lib/play";
+import { DisconnectBanner } from "./Partie";
 import { useMe } from "../state/app";
 import { useLive } from "../state/live";
 
@@ -73,9 +74,11 @@ export function Recap() {
   const winner = [...players].sort((a, b) => metric(b) - metric(a))[0];
   const myId = me.profile?.userId;
   const mine = players.find((m) => m.userId === myId);
-  const readyCount = players.filter((m) => m.ready || m.status !== "active").length;
+  // Même règle que le serveur : un joueur déconnecté est attendu tant que le groupe n'a pas choisi de
+  // continuer sans lui (il passe alors « absent »)
+  const readyCount = players.filter((m) => m.ready || m.status === "away").length;
   const nextGame = session.context === "classique" ? session.games[session.index] : session.games[session.index + 1];
-  const allReady = players.every((m) => m.ready || m.status !== "active");
+  const allReady = players.every((m) => m.ready || m.status === "away");
 
   const ready = () => post(`/api/temps-reel/sessions/${session.id}/ready`, {}).catch(() => {});
   const home = async () => {
@@ -85,6 +88,8 @@ export function Recap() {
   };
 
   return (
+    <>
+    {!final && <DisconnectBanner session={session} meId={myId} />}
     <div className="relative flex-auto flex flex-col items-center justify-center gap-7 pt-[30px] pb-10 gutter min-h-[calc(100vh-85px)]" style={{ background: glow("1000px 560px at 50% 520px", 20) }}>
       <div className="flex flex-col items-center gap-2.5 text-center">
         <span className="text-[13px] tracking-[0.1em] uppercase text-mut">
@@ -200,5 +205,6 @@ export function Recap() {
         )}
       </div>
     </div>
+    </>
   );
 }

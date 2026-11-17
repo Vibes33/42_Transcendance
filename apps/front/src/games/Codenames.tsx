@@ -25,7 +25,7 @@ interface View {
   guessesLeft: number;
   turnEndsAt: number;
   winner: Team | null;
-  log: { team: Team; clue: string; n: number; found: string[] }[];
+  log: { team: Team; clue: string; n: number; found: (Bi | string)[] }[];
   over: boolean;
 }
 
@@ -84,7 +84,7 @@ export function Codenames({ round, flow }: GameProps) {
                 <strong className="font-d uppercase">
                   {l.clue} · {l.n}
                 </strong>{" "}
-                · {l.found.length ? l.found.join(", ") : "—"}
+                · {l.found.length ? l.found.map((w) => (typeof w === "string" ? w : bi(w))).join(", ") : "—"}
               </span>
             ))}
         </div>

@@ -10,10 +10,11 @@ import { dayLabel, resultLine, topLabel } from "../lib/results";
 export function Historique() {
   const t = useT();
   const history = useHistory();
-  const list = history.data ?? [];
-  const played = list.length;
-  const sum = list.reduce((s, d) => s + d.total, 0);
-  const best = list.reduce((m, d) => Math.max(m, d.total), 0);
+  const list = history.data?.days ?? [];
+  // Bilan sur toutes les journées (la liste n'affiche que les 60 dernières)
+  const played = history.data?.totals.days ?? 0;
+  const sum = history.data?.totals.points ?? 0;
+  const best = history.data?.totals.best ?? 0;
 
   return (
     <div className="relative flex-auto flex flex-col" style={{ background: glow("900px 520px at 50% 300px", 18) }}>

@@ -46,7 +46,9 @@ function makeQuestion(seed: string, k: number): Question {
     return { kind, ref: c.id, answer: c.skins.length - 1, min: 0, max: 40, step: 1 };
   }
   const it = FINAL_ITEMS[Math.floor(r() * FINAL_ITEMS.length)];
-  return { kind, ref: it.id, answer: it.gold, min: 2000, max: 4000, step: 50 };
+  // Le pas du curseur doit permettre de tomber pile sur le prix (3 333 PO : pas de 1)
+  const step = it.gold % 50 === 0 ? 50 : it.gold % 10 === 0 ? 10 : 1;
+  return { kind, ref: it.id, answer: it.gold, min: Math.min(2000, it.gold), max: Math.max(4000, it.gold), step };
 }
 
 /** Points d'une réponse : écart absolu pour les années, écart relatif pour le reste. */
@@ -78,9 +80,16 @@ function present(q: Question) {
 
 export const chaudfroid: GameEngine<S> = {
   key: "chaudfroid",
-  create({ seed, now }) {
-    const questions = Array.from({ length: CHAUDFROID_QUESTIONS }, (_, k) => makeQuestion(seed, k));
-    return { state: { seed, questions, i: 0, answers: [], startedAt: now, endedAt: null }, contentKey: questions.map((q) => q.kind + ":" + q.ref).join("|") };
+  create({ seed, now, seen }) {
+    // Pas deux fois la même question dans une partie, ni une question déjà posée récemment
+    const key = (q: Question) => q.kind + ":" + q.ref;
+    const questions: Question[] = [];
+    for (const fresh of [true, false])
+      for (let k = 0; questions.length < CHAUDFROID_QUESTIONS && k < 200; k++) {
+        const q = makeQuestion(seed, k);
+        if (!questions.some((x) => key(x) === key(q)) && (!fresh || !seen.has(key(q)))) questions.push(q);
+      }
+    return { state: { seed, questions, i: 0, answers: [], startedAt: now, endedAt: null }, contentKey: questions.map(key) };
   },
   publicState(s, now) {
     const q = s.questions[s.i];

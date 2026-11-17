@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { CHAMPION_BY_ID, ITEM_BY_ID } from "@loltr/content";
+import { DEVINE_TURNS } from "@loltr/shared";
 import { createJeuxApp } from "./app";
 import { createDb } from "./db";
 import { ENGINES } from "./games";
@@ -162,11 +163,12 @@ describe("jeux de groupe à plateau partagé", () => {
     expect((await call(`/party/${ids[teller]}/act`, teller, { type: "clue", text: "un indice avec " + tv.word.fr.banned[0] })).body.error).toBe("banned_word");
     const found = (await call(`/party/${ids[guesser]}/act`, guesser, { type: "guess", text: tv.word.fr.word })).body.view;
     expect(found.points[0]).toBe(1);
-    // Fin des tours : les manches se closent avec le score de l'équipe
-    advance(61_000);
-    await call(`/party/${ids.u1}`, "u1");
-    advance(61_000);
-    const last = (await call(`/party/${ids.u1}`, "u1")).body;
+    // Fin des tours (DEVINE_TURNS au moins) : les manches se closent avec le score de l'équipe
+    let last = (await call(`/party/${ids.u1}`, "u1")).body;
+    for (let i = 0; i < DEVINE_TURNS && !last.view.over; i++) {
+      advance(61_000);
+      last = (await call(`/party/${ids.u1}`, "u1")).body;
+    }
     expect(last.view.over).toBe(true);
     expect(last.round.over).toBe(true);
   });

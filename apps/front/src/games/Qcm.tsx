@@ -32,12 +32,19 @@ export function Qcm({ round, act, flow, groupSize }: GameProps<Pub>) {
   const leftMs = flow.demo ? QCM_QUESTION_MS : Math.max(0, pub.deadline - now);
   const sent = useRef(-1);
 
-  // Temps écoulé sans réponse : la question est comptée fausse (le serveur vérifie l'heure)
+  // Temps écoulé sans réponse : la question est comptée fausse (le serveur vérifie l'heure). Refusé
+  // (marge réseau du serveur pas encore écoulée), on redemande chaque seconde jusqu'à ce qu'il accepte.
   useEffect(() => {
-    if (r || round.over || flow.demo || leftMs > 0 || sent.current === pub.i) return;
-    sent.current = pub.i;
-    act({ type: "timeout" }).catch(() => (sent.current = -1));
-  }, [leftMs <= 0, r, pub.i]);
+    if (r || round.over || flow.demo || leftMs > 0) return;
+    const send = () => {
+      if (sent.current === pub.i) return;
+      sent.current = pub.i;
+      act({ type: "timeout" }).catch(() => (sent.current = -1));
+    };
+    send();
+    const id = setInterval(send, 1000);
+    return () => clearInterval(id);
+  }, [leftMs <= 0, r, pub.i, round.over]);
 
   const timeColor = leftMs <= 5000 ? "var(--danger)" : "var(--acc)";
   return (

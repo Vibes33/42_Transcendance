@@ -1,6 +1,12 @@
 # Routage : le front sur /, chaque microservice sur /api/<service>, le temps réel sur /ws.
 http:
   routers:
+    to-https:
+      rule: "PathPrefix(`/`)"
+      priority: 1
+      entryPoints: [web]
+      service: noop@internal
+      middlewares: [to-https]
     front:
       rule: "PathPrefix(`/`)"
       priority: 1

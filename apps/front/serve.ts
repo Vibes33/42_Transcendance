@@ -3,9 +3,17 @@ const dist = new URL("./dist/", import.meta.url).pathname;
 
 Bun.serve({
   port: 3000,
+  development: false,
+  error: () => new Response("Erreur interne", { status: 500 }),
   hostname: "0.0.0.0",
   async fetch(req) {
-    const path = decodeURIComponent(new URL(req.url).pathname);
+    let path: string;
+    try {
+      path = decodeURIComponent(new URL(req.url).pathname);
+    } catch {
+      // Adresse mal encodée (« /%E0 ») : simple 400, jamais de trace d'erreur
+      return new Response("Bad Request", { status: 400 });
+    }
     if (path === "/health") return Response.json({ ok: true });
     if (!path.includes("..")) {
       const file = Bun.file(dist + path.replace(/^\/+/, ""));

@@ -33,6 +33,9 @@ services:
     ports:
       - "${HTTP_PORT:-8080}:80"
       - "${HTTPS_PORT:-8443}:443"
+    environment:
+      # Port HTTPS publié sur l'hôte, pour la redirection HTTP → HTTPS
+      HTTPS_PORT: "${HTTPS_PORT:-8443}"
     volumes:
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./traefik/dynamic:/etc/traefik/dynamic:ro

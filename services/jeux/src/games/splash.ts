@@ -91,6 +91,10 @@ export const splash: GameEngine<S> = {
   image(s) {
     return img.splash(CHAMPION_BY_ID[s.champ], s.skinNum);
   },
+  // Tant que la manche dure, seule la zone zoomée quitte le serveur (champion trouvé : zoom ×1)
+  imageCrop(s) {
+    return s.endedAt !== null ? null : { scale: SPLASH_SCALE[step(s)], origin: s.origin };
+  },
   timers() {
     return { endsAt: null, warmUntil: null };
   }

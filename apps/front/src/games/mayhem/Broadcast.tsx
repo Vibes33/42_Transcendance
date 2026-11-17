@@ -1,6 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LITE_BY_ID, MAYHEM_ROLES, RIFT, buildMovement, squareImg, type MayhemEvent, type MayhemGame, type MayhemTournament } from "@loltr/content/lite";
 import { useLang, useT } from "../../i18n";
+
+// Déplacements d'une partie : calcul coûteux, gardé pour les dernières parties regardées (la même
+// partie peut revenir sous un autre objet après un rafraîchissement de la manche)
+const movementCache = new Map<string, ReturnType<typeof buildMovement>>();
+function movementOf(game: MayhemGame) {
+  const key = `${game.blue}:${game.red}:${game.winner}:${game.duration}:${game.events.length}:${game.events[0]?.t ?? 0}`;
+  let mv = movementCache.get(key);
+  if (!mv) {
+    mv = buildMovement(game);
+    movementCache.set(key, mv);
+    if (movementCache.size > 8) movementCache.delete(movementCache.keys().next().value!);
+  }
+  return mv;
+}
 import { CrestBadge, Rift, RoleIcon, entrantName, entrantTag, rosterOf } from "./util";
 
 // Retransmission d'une partie simulée, sur le modèle d'un visualiseur de replay : toute la carte avec
@@ -149,7 +163,7 @@ export function Broadcast({
   const colorOf = (s: "a" | "b") => (s === mySide ? "var(--acc)" : s === "a" ? BLUE : RED);
 
   // Déplacements de la partie, calculés une fois (ils ne dépendent que de la partie)
-  const mv = useMemo(() => buildMovement(game), [game]);
+  const mv = useMemo(() => movementOf(game), [game]);
   const actors = mv.actors(time);
   const live = mv.kda(time);
   const objectives = mv.objectives(time);

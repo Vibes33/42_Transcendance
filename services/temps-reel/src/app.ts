@@ -36,6 +36,7 @@ export function createTempsReelApp(hub: Hub) {
       close(ws) {
         const socket = adapters.get(ws.id);
         adapters.delete(ws.id);
+        if (socket) hub.unwatch(socket);
         if (socket?.userId) hub.disconnect(socket.userId, socket);
       }
     })

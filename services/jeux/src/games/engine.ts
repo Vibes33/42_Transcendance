@@ -24,7 +24,8 @@ export interface ActOutcome<S> {
 
 export interface GameEngine<S = any> {
   key: GameKey;
-  create(ctx: CreateCtx): { state: S; contentKey: string };
+  /** `contentKey` : ce qui est montré au joueur (une clé, ou une par élément : questions, portraits…). */
+  create(ctx: CreateCtx): { state: S; contentKey: string | string[] };
   /** Ce que le joueur a le droit de voir. */
   publicState(state: S, now: number): Record<string, unknown>;
   act(state: S, action: Record<string, unknown>, now: number): ActOutcome<S>;
@@ -37,6 +38,11 @@ export interface GameEngine<S = any> {
   progress(state: S, now: number): { tries?: number; score?: number; leftMs?: number; step?: number; found?: boolean; colors?: string };
   /** Images à servir par le proxy (leurs URL d'origine trahiraient la réponse). */
   image?(state: S, slot: string): string | null;
+  /**
+   * Partie de l'image visible pour le joueur (zoom autour d'un point, en % de l'image) : le serveur
+   * ne sert que cette zone, jamais l'image entière avant la fin. null : image entière.
+   */
+  imageCrop?(state: S, slot: string): { scale: number; origin: string } | null;
   timers?(state: S): { endsAt: number | null; warmUntil: number | null };
 }
 

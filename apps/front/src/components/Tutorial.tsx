@@ -69,7 +69,8 @@ export function Tutorial({ steps, onDone }: { steps: TourStep[]; onDone: () => v
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onDone();
-      if (e.key === "ArrowRight" || e.key === "Enter") next();
+      // Entrée sur un bouton (« Suivant » a le focus) est déjà un clic : ne pas avancer deux fois
+      if (e.key === "ArrowRight" || (e.key === "Enter" && !(e.target instanceof HTMLButtonElement))) next();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

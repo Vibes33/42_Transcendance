@@ -57,6 +57,14 @@ type Plan = {
   /** Joueurs en vie minimum de `side` pour que l'action ait lieu (objectifs). */
   need?: number;
   tries?: number;
+  /** Identifiant stable (une action reportée garde le sien). */
+  id?: number;
+  /** Actions qui doivent avoir eu lieu avant (tour précédente de la voie, objectif précédent…). */
+  after?: number[];
+  /** Délai minimal après ces actions (réapparition d'un dragon, du Baron). */
+  gap?: number;
+  /** Action qui a toujours lieu (assaut de la base du vainqueur) : jamais abandonnée. */
+  must?: boolean;
 };
 
 // --- Gabarits de vraies parties pro (Oracle's Elixir, voir scripts/mayhem-calibrate.ts) ----------
@@ -286,16 +294,72 @@ function simGame(r: R, blue: number, red: number, ra: number, rb: number): Mayhe
   }
   plans.push({ t: duration, kind: "nexus", side: W, at: RIFT.nexus[L], kills: [0, 0], part: [3, 0], need: 1 });
 
+  // Ordre imposé : une tour après celle qui la précède sur sa voie, un inhibiteur après la tour qui
+  // le protège, les tours du Nexus après les inhibiteurs, et un objectif neutre seulement une fois
+  // réapparu. Les actions reportées plus bas gardent cet ordre.
+  plans.forEach((p, i) => (p.id = i));
+  const towerIdx = (p: Plan) => (p.kind === "tower" ? RIFT.towers[other(p.side)].indexOf(p.at) : -1);
+  const towerPlan = (side: Side, k: number) => plans.find((p) => p.kind === "tower" && p.side === side && towerIdx(p) === k);
+  const respawnGap: Partial<Record<Plan["kind"], number>> = { dragon: 300, baron: 360, herald: 0 };
+  for (const p of plans) {
+    const k = towerIdx(p);
+    if (k >= 0 && k < 9 && k % 3 > 0) p.after = [towerPlan(p.side, k - 1)?.id ?? -1].filter((x) => x >= 0);
+    if (k === 9) p.after = plans.filter((x) => x.kind === "inhib" && x.side === p.side).map((x) => x.id!);
+    if (k === 10) p.after = [towerPlan(p.side, 9)!.id!];
+    if (k >= 9) p.must = true;
+    if (p.kind === "inhib") {
+      const lane = RIFT.inhibs[other(p.side)].indexOf(p.at);
+      const guard = towerPlan(p.side, lane * 3 + 2);
+      p.after = guard ? [guard.id!] : [];
+      p.must = true;
+      // Les tours qui mènent à un inhibiteur tombent forcément avant lui
+      for (let j = 0; j < 3; j++) {
+        const tw = towerPlan(p.side, lane * 3 + j);
+        if (tw) tw.must = true;
+      }
+    }
+    if (p.kind === "nexus") p.after = [towerPlan(p.side, 9)!.id!, towerPlan(p.side, 10)!.id!];
+    if (p.kind in respawnGap) {
+      const prev = plans.filter((x) => x.kind === p.kind && x.t < p.t).sort((x, y) => y.t - x.t)[0];
+      if (prev) {
+        p.after = [prev.id!];
+        p.gap = respawnGap[p.kind]! + 5;
+      }
+    }
+  }
+  const doneAt = new Map<number, number>();
+  let guard = 0;
+
   // --- Déroulé : les morts réapparaissent après un délai, personne ne combat sans être en vie ---
   const pending = plans;
-  while (pending.length) {
+  while (pending.length && guard++ < 20_000) {
     pending.sort((x, y) => x.t - y.t);
     const pl = pending.shift()!;
     const s = pl.side;
     const o = other(s);
-    const t = Math.round(pl.kind === "nexus" || pl.kind === "inhib" ? pl.t : Math.min(pl.t, end - 10));
+    // Prérequis : on attend qu'ils aient eu lieu ; s'ils n'auront jamais lieu, l'action non plus
+    // (sauf l'assaut de la base, qui a toujours lieu)
+    if (pl.after?.length) {
+      const waiting = pl.after.filter((id) => !doneAt.has(id));
+      const queued = pending.filter((x) => x.id !== undefined && waiting.includes(x.id));
+      if (waiting.length && queued.length) {
+        pending.push({ ...pl, t: Math.max(pl.t, ...queued.map((x) => x.t)) + 5 });
+        continue;
+      }
+      if (waiting.length && !pl.must) continue;
+      const ready = Math.max(-Infinity, ...pl.after.filter((id) => doneAt.has(id)).map((id) => doneAt.get(id)! + (pl.gap ?? 5)));
+      if (pl.t < ready) {
+        // Plus le temps avant la fin de la partie : l'objectif n'est pas repris
+        if (!pl.must && pl.kind !== "nexus" && ready > end - 10) continue;
+        pending.push({ ...pl, t: ready });
+        continue;
+      }
+    }
+    // Les tours du Nexus, les inhibiteurs et le Nexus se prennent à leur heure (fin de partie)
+    const late = pl.kind === "nexus" || pl.kind === "inhib" || towerIdx(pl) >= 9;
+    const t = Math.round(late ? pl.t : Math.min(pl.t, end - 10));
     const aliveS = alive(s, t);
-    const final = pl.kind === "nexus" || pl.kind === "inhib" || (pl.kind === "teamfight" && pl.t === end);
+    const final = pl.must || pl.kind === "nexus" || pl.kind === "inhib" || (pl.kind === "teamfight" && pl.t === end);
     // Pas assez de joueurs en vie pour l'objectif : il est repoussé à la prochaine réapparition
     if (pl.need && aliveS.length < pl.need && !final && (pl.tries ?? 0) < 4) {
       const next = Math.min(...deadUntil[s].filter((d) => d > t));
@@ -364,6 +428,7 @@ function simGame(r: R, blue: number, red: number, ra: number, rb: number): Mayhe
       ev.victim = deadO[0];
     }
     events.push(ev);
+    if (pl.id !== undefined) doneAt.set(pl.id, t);
   }
   events.sort((x, y) => x.t - y.t);
   // Premier sang : la première élimination de la partie

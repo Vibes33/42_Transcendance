@@ -1,8 +1,9 @@
 import { Elysia, t } from "elysia";
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { MAYHEM_ENTRANTS, MAYHEM_ROLES, MAYHEM_TEAM_BY_ID, mayhemRating, type MayhemEntrant } from "@loltr/content";
 import {
   GAMES,
+  addDays,
   basePoints,
   dayKey,
   forceCloseAt,
@@ -24,6 +25,23 @@ import type { MayhemState } from "./games/mayhem";
 import { botFill } from "./games/mayhemDraft";
 import { simulateTournament } from "./games/mayhemSim";
 import { rotationFor } from "@loltr/shared";
+import sharp from "sharp";
+
+/**
+ * Zone visible d'une image zoomée de `scale` autour de `origin` (« 40% 62% », comme un
+ * transform-origin CSS) : le même cadrage que le zoom de l'interface, découpé côté serveur.
+ */
+async function cropImage(body: ArrayBuffer, crop: { scale: number; origin: string }): Promise<ArrayBuffer> {
+  const img = sharp(Buffer.from(body));
+  const { width = 0, height = 0 } = await img.metadata();
+  const [ox, oy] = crop.origin.split(" ").map((x) => Math.min(1, Math.max(0, parseFloat(x) / 100)));
+  const w = Math.max(1, Math.round(width / crop.scale));
+  const h = Math.max(1, Math.round(height / crop.scale));
+  const left = Math.min(width - w, Math.max(0, Math.round(ox * width * (1 - 1 / crop.scale))));
+  const top = Math.min(height - h, Math.max(0, Math.round(oy * height * (1 - 1 / crop.scale))));
+  const out = await img.extract({ left, top, width: w, height: h }).jpeg({ quality: 88 }).toBuffer();
+  return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer;
+}
 
 export interface JeuxDeps {
   db: Db;
@@ -33,7 +51,7 @@ export interface JeuxDeps {
   /** Membres du groupe de l'utilisateur (lui compris), ou null. */
   groupOf: (userId: string) => Promise<{ id: string; members: string[] } | null>;
   /** Session temps réel (groupe ou stream) : graine partagée et membres. */
-  session: (sessionId: string) => Promise<{ kind: "group" | "stream"; seed: string; members: string[]; game?: string | null } | null>;
+  session: (sessionId: string) => Promise<{ kind: "group" | "stream"; seed: string; members: string[]; away?: string[]; index?: number; game?: string | null } | null>;
   /** Points prévisionnels de la journée (service classement), au mieux. */
   projection: (userId: string, day: string) => Promise<Record<string, { base: number; projected: number; top?: number; ranked?: boolean; players?: number }>>;
   /** Profils publics (pseudo, chibi), pour l'équipe du jour de World Mayhem. */
@@ -123,34 +141,50 @@ export function createJeuxApp(deps: JeuxDeps) {
     };
   }
 
-  /** Clôt une manche : résultat, points de base, événements ; marque le défi terminé au besoin. */
+  /** Manche du défi jouée après la clôture de son jour (3 h 30) : elle ne rapporte plus rien. */
+  const lateDefi = (r: { context: string; day: string }, t: number) => r.context === "defi" && t >= forceCloseAt(r.day);
+
+  /**
+   * Clôt une manche : résultat, points de base, événements ; marque le défi terminé au besoin.
+   * L'état est relu et écrit sans attente entre les deux : deux appels simultanés ne la clôturent
+   * qu'une fois, et les événements ne partent qu'une fois.
+   */
   async function finalize(r: RoundRow, t: number): Promise<RoundRow> {
-    if (r.over) return r;
-    const e = ENGINES[r.game as GameKey];
-    const state = e.finish(r.state, t);
+    const fresh = db.select().from(rounds).where(eq(rounds.id, r.id)).get() ?? r;
+    if (fresh.over) return fresh;
+    const e = ENGINES[fresh.game as GameKey];
+    const state = e.finish(fresh.state, t);
     const result = e.result(state, t);
-    const base = r.context === "defi" ? basePoints(result) : 0;
-    db.update(rounds).set({ state, over: true, result, basePoints: base, finishedAt: t }).where(eq(rounds.id, r.id)).run();
-    const done = { ...r, state, over: true, result, basePoints: base, finishedAt: t };
-    await deps.publish("round.finished", {
-      roundId: r.id,
-      userId: r.userId,
-      kind: r.kind as "user" | "guest",
-      day: r.day,
-      game: r.game as GameKey,
-      context: r.context as GameContext,
-      sessionId: r.sessionId,
-      result,
-      basePoints: base
-    });
-    if (r.context === "defi") {
-      const row = dailyRow(r.userId, r.day);
-      const played = defiRounds(r.userId, r.day).filter((x) => x.over || x.id === r.id);
-      if (row && (row.games as string[]).every((g) => played.some((p) => p.game === g))) {
-        db.update(daily).set({ status: "done" }).where(and(eq(daily.userId, r.userId), eq(daily.day, r.day))).run();
-        await deps.publish("defi.completed", { userId: r.userId, day: r.day });
+    const late = lateDefi(fresh, t);
+    const base = fresh.context === "defi" && !late ? basePoints(result) : 0;
+    const upd = db.update(rounds).set({ state, over: true, result, basePoints: base, finishedAt: t }).where(and(eq(rounds.id, fresh.id), eq(rounds.over, false))).run() as unknown as { changes: number };
+    const done = { ...fresh, state, over: true, result, basePoints: base, finishedAt: t };
+    if (upd.changes === 0) return db.select().from(rounds).where(eq(rounds.id, fresh.id)).get() ?? done;
+    let completed = false;
+    if (fresh.context === "defi") {
+      const row = dailyRow(fresh.userId, fresh.day);
+      const played = defiRounds(fresh.userId, fresh.day).filter((x) => x.over);
+      if (late) db.update(daily).set({ status: "closed" }).where(and(eq(daily.userId, fresh.userId), eq(daily.day, fresh.day), eq(daily.status, "running"))).run();
+      else if (row && (row.games as string[]).every((g) => played.some((p) => p.game === g))) {
+        const ch = db.update(daily).set({ status: "done" }).where(and(eq(daily.userId, fresh.userId), eq(daily.day, fresh.day), eq(daily.status, "running"))).run() as unknown as { changes: number };
+        completed = ch.changes > 0;
       }
     }
+    // Une manche du défi close après 3 h 30 ne part pas au classement (le jour est déjà soldé)
+    if (!late)
+      await deps.publish("round.finished", {
+        roundId: fresh.id,
+        userId: fresh.userId,
+        kind: fresh.kind as "user" | "guest",
+        day: fresh.day,
+        game: fresh.game as GameKey,
+        context: fresh.context as GameContext,
+        sessionId: fresh.sessionId,
+        result,
+        basePoints: base,
+        seed: fresh.seed
+      });
+    if (completed) await deps.publish("defi.completed", { userId: fresh.userId, day: fresh.day, kind: fresh.kind as "user" | "guest" });
     return done;
   }
 
@@ -159,20 +193,24 @@ export function createJeuxApp(deps: JeuxDeps) {
     const r = db.select().from(rounds).where(eq(rounds.id, id)).get();
     if (!r || r.userId !== me) fail(404, "round_not_found");
     const t = now();
-    if (!r!.over && ENGINES[r!.game as GameKey].isOver(r!.state, t)) return finalize(r!, t);
+    if (!r!.over && (ENGINES[r!.game as GameKey].isOver(r!.state, t) || lateDefi(r!, t))) return finalize(r!, t);
     return r!;
   }
 
-  /** Partie partagée ouverte du groupe pour ce jeu (créée par le premier arrivé). */
+  /**
+   * Partie partagée du groupe pour la manche en cours (créée par le premier arrivé). Elle est liée à
+   * la manche de la session : une partie abandonnée ne revient pas à la relance suivante.
+   */
   async function openParty(game: GameKey, sessionId: string, me: string, t: number): Promise<string> {
     const s = await deps.session(sessionId);
     if (!s || !s.members.includes(me)) fail(403, "not_in_session");
+    if (s!.game && s!.game !== game) fail(409, "wrong_game", "Ce n’est pas le jeu de la session.");
     const party = PARTIES[game]!;
-    const open = db.select().from(parties).where(and(eq(parties.sessionId, sessionId), eq(parties.game, game), eq(parties.over, false))).orderBy(desc(parties.createdAt)).get();
-    if (open) return open.id;
-    if (s!.members.length < party.minPlayers) fail(409, "not_enough_players", `Il faut au moins ${party.minPlayers} joueurs dans le groupe.`);
-    const id = crypto.randomUUID();
-    db.insert(parties).values({ id, sessionId, game, state: party.create(id, s!.members, t), createdAt: t }).run();
+    const id = `${sessionId}:${game}:${s!.index ?? 0}`;
+    if (db.select().from(parties).where(eq(parties.id, id)).get()) return id;
+    const players = s!.members.filter((u) => !(s!.away ?? []).includes(u));
+    if (players.length < party.minPlayers) fail(409, "not_enough_players", `Il faut au moins ${party.minPlayers} joueurs dans le groupe.`);
+    db.insert(parties).values({ id, sessionId, game, state: party.create(id, players, t), createdAt: t }).onConflictDoNothing().run();
     return id;
   }
 
@@ -181,7 +219,10 @@ export function createJeuxApp(deps: JeuxDeps) {
     const row = db.select().from(parties).where(eq(parties.id, partyId)).get();
     if (!row) fail(404, "party_not_found");
     const party = PARTIES[row!.game as GameKey]!;
-    const state = party.tick(row!.state, t);
+    // Joueurs encore là : un maître-espion ou un conteur parti ne bloque pas la partie
+    const sess = row!.over ? null : await deps.session(row!.sessionId);
+    const present = sess ? sess.members.filter((u) => !(sess.away ?? []).includes(u)) : undefined;
+    const state = party.tick(row!.state, t, present);
     if (state !== row!.state) db.update(parties).set({ state, over: party.isOver(state) }).where(eq(parties.id, partyId)).run();
     if (party.isOver(state)) {
       const open = db.select().from(rounds).where(and(eq(rounds.game, row!.game), eq(rounds.sessionId, row!.sessionId), eq(rounds.over, false))).all();
@@ -204,7 +245,24 @@ export function createJeuxApp(deps: JeuxDeps) {
     return false;
   }
 
-  return new Elysia({ prefix: "/api/jeux" })
+  /** Toutes les minutes : les manches du défi encore ouvertes après 3 h 30 sont closes à 0 point. */
+  async function closeExpired(t: number = now()) {
+    const open = db.select().from(rounds).where(and(eq(rounds.context, "defi"), eq(rounds.over, false))).all();
+    for (const r of open) if (lateDefi(r, t)) await finalize(r, t);
+    for (const d of db.select().from(daily).where(eq(daily.status, "running")).all())
+      if (t >= forceCloseAt(d.day)) db.update(daily).set({ status: "closed" }).where(and(eq(daily.userId, d.userId), eq(daily.day, d.day), eq(daily.status, "running"))).run();
+  }
+
+  /** Compte supprimé : ses défis, manches et contenus vus sont effacés. */
+  function forget(userId: string) {
+    db.transaction((tx) => {
+      tx.delete(rounds).where(eq(rounds.userId, userId)).run();
+      tx.delete(daily).where(eq(daily.userId, userId)).run();
+      tx.delete(seen).where(eq(seen.userId, userId)).run();
+    });
+  }
+
+  const app = new Elysia({ prefix: "/api/jeux" })
     .use(callerPlugin)
     .use(health)
     .get("/rotation", () => {
@@ -229,6 +287,8 @@ export function createJeuxApp(deps: JeuxDeps) {
         if (row) {
           if (row.mode !== body.mode) fail(409, "mode_locked", row.mode === "solo" ? "Tu as déjà commencé le défi du jour en solo." : "Tu as déjà commencé le défi du jour en groupe.");
           if (body.mode === "groupe" && body.sessionId && row.sessionId !== body.sessionId) {
+            const s = await deps.session(body.sessionId);
+            if (!s || s.kind !== "group" || !s.members.includes(me)) fail(403, "not_in_session");
             db.update(daily).set({ sessionId: body.sessionId }).where(and(eq(daily.userId, me), eq(daily.day, day))).run();
           }
           return dailyState(me, t);
@@ -236,7 +296,8 @@ export function createJeuxApp(deps: JeuxDeps) {
         if (caller.kind === "guest") {
           // Un même appareil ne peut produire qu'un seul défi par jour
           if (!caller.device) fail(400, "device_required");
-          const other = db.select().from(daily).where(and(eq(daily.deviceId, caller.device!), eq(daily.day, day), eq(daily.kind, "guest"), ne(daily.userId, me))).get();
+          // Tous les défis de l'appareil comptent, même ceux d'un invité depuis fusionné dans un compte
+          const other = db.select().from(daily).where(and(eq(daily.deviceId, caller.device!), eq(daily.day, day), ne(daily.userId, me))).get();
           if (other) fail(409, "device_used", "Le défi du jour a déjà été joué depuis cet appareil.");
         }
         if (body.mode === "groupe") {
@@ -295,7 +356,12 @@ export function createJeuxApp(deps: JeuxDeps) {
           // Mode streamer : même contenu pour toute la session (graine partagée), jamais de points classés
           const s = body.sessionId ? await deps.session(body.sessionId) : null;
           if (!s || s.kind !== "stream" || !s.members.includes(me)) fail(403, "not_in_session");
+          // Seul le jeu de la manche en cours, et seulement un jeu jouable en stream
+          if (s!.game !== game || !GAMES[game].modes.includes("streamer")) fail(409, "wrong_game", "Ce n’est pas le jeu de la session.");
           seed = s!.seed + ":" + game;
+          // Page rechargée : la manche déjà commencée (ou finie) se reprend, elle ne se rejoue pas
+          const prev = db.select().from(rounds).where(and(eq(rounds.userId, me), eq(rounds.sessionId, body.sessionId!), eq(rounds.seed, seed))).get();
+          if (prev) return toState(prev.over || !ENGINES[game].isOver(prev.state, t) ? prev : await finalize(prev, t), t);
         }
         // Sudoku : la grille du jour, la même pour tout le monde
         if (game === "sudoku") seed = "sudoku:" + dayKey(t);
@@ -310,9 +376,10 @@ export function createJeuxApp(deps: JeuxDeps) {
         const id = crypto.randomUUID();
         db.transaction((tx) => {
           tx.insert(rounds)
-            .values({ id, userId: me, kind: caller.kind === "guest" ? "guest" : "user", day, game, context: body.context, sessionId: body.context === "defi" ? (dailyRow(me, day)?.sessionId ?? null) : (body.sessionId ?? null), state, startedAt: t })
+            .values({ id, userId: me, kind: caller.kind === "guest" ? "guest" : "user", day, game, context: body.context, sessionId: body.context === "defi" ? (dailyRow(me, day)?.sessionId ?? null) : (body.sessionId ?? null), seed: body.context === "streamer" ? seed : null, state, startedAt: t })
             .run();
-          tx.insert(seen).values({ userId: me, game, contentKey, at: t }).onConflictDoUpdate({ target: [seen.userId, seen.game, seen.contentKey], set: { at: t } }).run();
+          for (const key of Array.isArray(contentKey) ? contentKey : [contentKey])
+            tx.insert(seen).values({ userId: me, game, contentKey: key, at: t }).onConflictDoUpdate({ target: [seen.userId, seen.game, seen.contentKey], set: { at: t } }).run();
         });
         return toState(db.select().from(rounds).where(eq(rounds.id, id)).get()!, t);
       },
@@ -328,12 +395,17 @@ export function createJeuxApp(deps: JeuxDeps) {
     .post(
       "/rounds/:id/act",
       async ({ caller, params, body }) => {
-        const r = await loadRound(params.id, caller);
+        await loadRound(params.id, caller);
         const t = now();
+        // Relu juste avant d'écrire, sans attente entre les deux : des essais envoyés en même temps
+        // s'appliquent l'un après l'autre au lieu de partir tous du même état
+        const r = db.select().from(rounds).where(eq(rounds.id, params.id)).get()!;
         if (r.over) fail(409, "round_over", "La manche est terminée.");
         const engine = ENGINES[r.game as GameKey];
         const { state, feedback } = engine.act(r.state, body as Record<string, unknown>, t);
         db.update(rounds).set({ state }).where(eq(rounds.id, r.id)).run();
+        // World Mayhem : l'avancée dans le tournoi est seulement enregistrée (sans renvoyer le tournoi)
+        if (r.game === "mayhem" && body.type === "watched") return { ok: true };
         let cur: RoundRow = { ...r, state };
         if (engine.isOver(state, t)) cur = await finalize(cur, t);
         if (r.sessionId || r.context === "defi") {
@@ -414,14 +486,17 @@ export function createJeuxApp(deps: JeuxDeps) {
         mine: myWinner ? { champion: myWinner, rankToday: day.rank(myWinner) || null, shareToday: day.share(myWinner), rankAll: all.rank(myWinner) || null } : null
       };
     })
-    // Sudoku LoL : temps des grilles du jour réussies (première grille de chacun)
+    // Sudoku LoL : temps des grilles du jour réussies. Seule la première grille commencée par chacun
+    // compte, réussie ou non : une grille abandonnée puis relancée ne se rejoue pas pour le temps.
     .get("/sudoku/stats", ({ caller }) => {
       const today = dayKey(now());
-      const rows = db.select().from(rounds).where(and(eq(rounds.game, "sudoku"), eq(rounds.day, today), eq(rounds.over, true))).all();
+      const rows = db.select().from(rounds).where(and(eq(rounds.game, "sudoku"), eq(rounds.day, today))).all();
+      const firstRound = new Map<string, RoundRow>();
+      for (const r of rows.sort((a, b) => a.startedAt - b.startedAt)) if (!firstRound.has(r.userId)) firstRound.set(r.userId, r);
       const first = new Map<string, number>();
-      for (const r of rows.sort((a, b) => a.startedAt - b.startedAt)) {
+      for (const [u, r] of firstRound) {
         const res = r.result as { solved?: boolean; durationMs?: number } | null;
-        if (res?.solved && !first.has(r.userId)) first.set(r.userId, res.durationMs ?? 0);
+        if (r.over && res?.solved) first.set(u, res.durationMs ?? 0);
       }
       const times = [...first.values()].sort((a, b) => a - b);
       const mine = caller.id ? first.get(caller.id) ?? null : null;
@@ -436,16 +511,26 @@ export function createJeuxApp(deps: JeuxDeps) {
     })
     .get("/rounds/:id/image/:slot", async ({ caller, params, set }) => {
       const r = await loadRound(params.id, caller);
-      const url = ENGINES[r.game as GameKey].image?.(r.state, params.slot);
+      const engine = ENGINES[r.game as GameKey];
+      const url = engine.image?.(r.state, params.slot);
       if (!url) fail(404, "no_image");
-      let hit = imageCache.get(url!);
-      if (!hit) {
-        const res = await (deps.fetchImage ?? fetch)(url!);
-        if (!res.ok) fail(502, "image_unavailable");
-        hit = { body: await res.arrayBuffer(), type: res.headers.get("content-type") ?? "image/png" };
-        if (imageCache.size > 2000) imageCache.delete(imageCache.keys().next().value!);
-        imageCache.set(url!, hit);
-      }
+      const cached = async (key: string, make: () => Promise<{ body: ArrayBuffer; type: string }>) => {
+        let hit = imageCache.get(key);
+        if (!hit) {
+          hit = await make();
+          if (imageCache.size > 2000) imageCache.delete(imageCache.keys().next().value!);
+          imageCache.set(key, hit);
+        }
+        return hit;
+      };
+      const full = () =>
+        cached(url!, async () => {
+          const res = await (deps.fetchImage ?? fetch)(url!);
+          if (!res.ok) fail(502, "image_unavailable");
+          return { body: await res.arrayBuffer(), type: res.headers.get("content-type") ?? "image/png" };
+        });
+      const crop = engine.imageCrop?.(r.state, params.slot) ?? null;
+      const hit = crop && crop.scale > 1 ? await cached(`${url}#${crop.scale}@${crop.origin}`, async () => ({ body: await cropImage((await full()).body, crop), type: "image/jpeg" })) : await full();
       set.headers["content-type"] = hit.type;
       set.headers["cache-control"] = "private, max-age=600";
       return new Response(hit.body, { headers: { "content-type": hit.type, "cache-control": "private, max-age=600" } });
@@ -460,8 +545,10 @@ export function createJeuxApp(deps: JeuxDeps) {
       const latest = new Map<string, RoundRow>();
       for (const r of rows) if (!latest.has(r.userId)) latest.set(r.userId, r);
       const stateOf = (u: string) => latest.get(u)?.state as MayhemState | undefined;
-      // Un joueur qui a quitté la partie sans valider ne bloque pas le groupe
-      const members = s!.members.map((u) => ({ userId: u, locked: !!stateOf(u)?.locked, gone: !!latest.get(u)?.over && !stateOf(u)?.locked }));
+      // Un joueur qui a quitté la partie, ou que le groupe a laissé (« continuer sans lui »), sans
+      // avoir validé son équipe ne bloque pas le groupe
+      const away = new Set(s!.away ?? []);
+      const members = s!.members.map((u) => ({ userId: u, locked: !!stateOf(u)?.locked, gone: (!!latest.get(u)?.over || away.has(u)) && !stateOf(u)?.locked }));
       let tournament = stateOf(me)?.tournament ?? null;
       const ready = members.filter((m) => m.locked);
       if (!tournament && ready.length > 0 && members.every((m) => m.locked || m.gone)) {
@@ -489,11 +576,24 @@ export function createJeuxApp(deps: JeuxDeps) {
           ids = new Set([u, ...((await deps.friends?.(u)) ?? [])]);
         }
         const best = new Map<string, { userId: string; rating: number; wins: number; score: number; picks: MayhemState["picks"]; crest: MayhemState["crest"]; at: number }>();
-        const rows = db.select().from(rounds).where(and(eq(rounds.game, "mayhem"), eq(rounds.day, day), eq(rounds.kind, "user"))).all();
+        // Seuls l'équipe et l'écusson sont lus dans l'état (pas le tournoi, très lourd)
+        const rows = db
+          .select({
+            userId: rounds.userId,
+            over: rounds.over,
+            result: rounds.result,
+            startedAt: rounds.startedAt,
+            locked: sql<number | null>`json_extract(${rounds.state}, '$.locked')`,
+            picks: sql<string | null>`json_extract(${rounds.state}, '$.picks')`,
+            crest: sql<string | null>`json_extract(${rounds.state}, '$.crest')`
+          })
+          .from(rounds)
+          .where(and(eq(rounds.game, "mayhem"), eq(rounds.day, day), eq(rounds.kind, "user")))
+          .all();
         for (const r of rows) {
           if (ids && !ids.has(r.userId)) continue;
-          const st = r.state as MayhemState;
-          if (!st.locked) continue;
+          if (!r.locked) continue;
+          const st = { picks: JSON.parse(r.picks ?? "{}") as MayhemState["picks"], crest: r.crest ? (JSON.parse(r.crest) as MayhemState["crest"]) : null };
           const rating = mayhemRating(st.picks, st.crest?.id).rating;
           // Victoires connues seulement une fois le tournoi fini (sinon on dévoilerait sa fin)
           const wins = r.over ? ((r.result as { wins?: number } | null)?.wins ?? 0) : 0;
@@ -554,7 +654,7 @@ export function createJeuxApp(deps: JeuxDeps) {
       g
         .use(internalGuard)
         // Fusion invité → compte : le défi du jour de l'invité passe au compte, sauf si le compte l'a déjà fait.
-        .post("/merge", ({ body }) => ({ moved: mergeGuest(db, body.guestId, body.userId, body.day) }), {
+        .post("/merge", ({ body }) => ({ moved: mergeGuest(db, body.guestId, body.userId, body.day, now()) }), {
           body: t.Object({ guestId: t.String(), userId: t.String(), day: t.String() })
         })
         // Retour dans le groupe après une déconnexion : les jeux du défi manqués valent 0 point.
@@ -586,15 +686,25 @@ export function createJeuxApp(deps: JeuxDeps) {
           { body: t.Object({ userId: t.String(), day: t.String(), upTo: t.String() }) }
         )
     );
+  return Object.assign(app, { closeExpired, forget });
 }
 
-/** Fusion invité → compte : le défi du jour de l'invité passe au compte, sauf si le compte l'a déjà fait. */
-export function mergeGuest(db: Db, guestId: string, userId: string, day: string): boolean {
-  const has = db.select().from(daily).where(and(eq(daily.userId, userId), eq(daily.day, day))).get();
-  if (has) return false;
-  db.transaction((tx) => {
-    tx.update(daily).set({ userId, kind: "user" }).where(and(eq(daily.userId, guestId), eq(daily.day, day))).run();
-    tx.update(rounds).set({ userId, kind: "user" }).where(and(eq(rounds.userId, guestId), eq(rounds.day, day))).run();
-  });
-  return true;
+/**
+ * Fusion invité → compte : le défi de l'invité passe au compte, jour par jour, sauf si le compte a
+ * déjà commencé ce jour-là. La veille compte aussi tant qu'elle est jouable (avant 3 h 30). C'est
+ * cette décision que suit le classement (événement `defi.merged`). Renvoie les jours transférés.
+ */
+export function mergeGuest(db: Db, guestId: string, userId: string, day: string, t: number = Date.now()): string[] {
+  const moved: string[] = [];
+  for (const d of [addDays(day, -1), day]) {
+    if (d !== day && t >= forceCloseAt(d)) continue;
+    const guest = db.select().from(daily).where(and(eq(daily.userId, guestId), eq(daily.day, d))).get();
+    if (!guest || db.select().from(daily).where(and(eq(daily.userId, userId), eq(daily.day, d))).get()) continue;
+    db.transaction((tx) => {
+      tx.update(daily).set({ userId, kind: "user" }).where(and(eq(daily.userId, guestId), eq(daily.day, d))).run();
+      tx.update(rounds).set({ userId, kind: "user" }).where(and(eq(rounds.userId, guestId), eq(rounds.day, d))).run();
+    });
+    moved.push(d);
+  }
+  return moved;
 }

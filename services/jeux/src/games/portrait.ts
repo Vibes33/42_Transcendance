@@ -35,7 +35,11 @@ export function portraitLines(c: Champion, seed: string): Line[] {
   const species = (lang: Lang) => list(a.species.map((x) => L.species[x][lang].toLowerCase()), lang);
   const pos = (lang: Lang) => list(a.positions.map((x) => L.position[x][lang]), lang);
   const range = a.range.length > 1 ? { fr: "au corps à corps comme à distance", en: "both in melee and at range" } : a.range[0] === "ranged" ? { fr: "à distance", en: "at range" } : { fr: "au corps à corps", en: "in melee" };
-  const spells = c.spells.filter((s) => s.slot !== "R");
+  // Un sort qui porte le nom du champion (« Ligue de Draven », « Marque des Kindred ») le trahirait
+  const own = (x: string) => [c.names.fr, c.names.en].some((n) => x.toLowerCase().includes(n.toLowerCase()));
+  const named = c.spells.filter((s) => s.slot !== "R");
+  const clean = named.filter((s) => !own(s.names.fr) && !own(s.names.en));
+  const spells = clean.length ? clean : named;
   const spell = spells[Math.floor(r() * spells.length)];
   return [
     { fr: `Je viens de ${regions("fr")} ; mon espèce : ${species("fr")}.`, en: `I come from ${regions("en")}; my species: ${species("en")}.` },
@@ -66,7 +70,8 @@ export const portrait: GameEngine<S> = {
     const champs = pickChampions(seed, seen);
     return {
       state: { seed, portraits: champs.map((champion) => ({ champion, shown: 1, misses: [], found: null })), i: 0, score: 0, startedAt: now, endedAt: null },
-      contentKey: champs[0]
+      // Les 5 champions de la partie sont notés comme vus, pas seulement le premier
+      contentKey: champs
     };
   },
   publicState(s, now) {

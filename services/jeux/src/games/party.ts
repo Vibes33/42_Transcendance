@@ -1,4 +1,4 @@
-import { CODENAMES_TURN_MS, DEVINE_TURN_MS, matchName, rng, shuffle, type GameKey } from "@loltr/shared";
+import { CODENAMES_TURN_MS, DEVINE_TURNS, DEVINE_TURN_MS, matchName, rng, shuffle, type GameKey } from "@loltr/shared";
 import { CODENAMES_WORDS, DEVINE_WORDS, type Lang } from "@loltr/content";
 import { GameError, type GameEngine } from "./engine";
 
@@ -13,8 +13,8 @@ export interface PartyGame<S> {
   /** Ce qu'un joueur voit (le maître-espion voit les couleurs, celui qui fait deviner voit le mot…). */
   view(s: S, userId: string, now: number): Record<string, unknown>;
   act(s: S, userId: string, action: Record<string, unknown>, now: number): S;
-  /** Avance l'état avec le temps (fin de tour). */
-  tick(s: S, now: number): S;
+  /** Avance l'état avec le temps (fin de tour) et les départs : `present` liste les joueurs encore là. */
+  tick(s: S, now: number, present?: string[]): S;
   isOver(s: S): boolean;
   scoreOf(s: S, userId: string): number;
 }
@@ -39,7 +39,8 @@ export interface CodenamesState {
   guessesLeft: number;
   turnEndsAt: number;
   winner: Team | null;
-  log: { team: Team; clue: string; n: number; found: string[] }[];
+  /** Cartes trouvées dans les deux langues (l'interface affiche celle du joueur). */
+  log: { team: Team; clue: string; n: number; found: T[] }[];
   endedAt: number | null;
 }
 
@@ -98,7 +99,7 @@ export const codenamesParty: PartyGame<CodenamesState> = {
     if (!Number.isInteger(i) || i < 0 || i >= 25 || s.revealed[i]) throw new GameError("bad_card");
     const revealed = s.revealed.map((x, j) => x || j === i);
     const color = s.key[i];
-    const log = s.log.map((l, j) => (j === s.log.length - 1 ? { ...l, found: [...l.found, s.words[i].fr] } : l));
+    const log = s.log.map((l, j) => (j === s.log.length - 1 ? { ...l, found: [...l.found, s.words[i]] } : l));
     const next: CodenamesState = { ...s, revealed, log };
     if (color === "x") return { ...next, winner: other(team), endedAt: now };
     const remaining = (t: Team) => s.key.filter((c, j) => c === t && !revealed[j]).length;
@@ -108,15 +109,26 @@ export const codenamesParty: PartyGame<CodenamesState> = {
     const guessesLeft = s.guessesLeft - 1;
     return guessesLeft <= 0 ? endTurn(next, now) : { ...next, guessesLeft };
   },
-  tick(s, now) {
-    return !s.endedAt && now > s.turnEndsAt ? endTurn(s, now) : s;
+  tick(s, now, present) {
+    if (s.endedAt) return s;
+    if (present) {
+      // Un maître-espion parti est remplacé par un équipier encore là ; une équipe vide perd
+      const here = (t: Team) => s.teams[t].filter((u) => present.includes(u));
+      const a = here("a");
+      const b = here("b");
+      if (!a.length || !b.length) return { ...s, winner: a.length ? "a" : b.length ? "b" : null, endedAt: now };
+      const spy = { a: a.includes(s.spy.a) ? s.spy.a : a[0], b: b.includes(s.spy.b) ? s.spy.b : b[0] };
+      if (spy.a !== s.spy.a || spy.b !== s.spy.b) s = { ...s, spy };
+    }
+    return now > s.turnEndsAt ? endTurn(s, now) : s;
   },
   isOver(s) {
     return s.endedAt !== null;
   },
   scoreOf(s, userId) {
-    const team = s.teams.a.includes(userId) ? "a" : "b";
-    return s.winner === team ? 100 : 0;
+    // Un spectateur (hors des deux équipes) ne marque rien
+    const team = s.teams.a.includes(userId) ? "a" : s.teams.b.includes(userId) ? "b" : null;
+    return team && s.winner === team ? 100 : 0;
   }
 };
 
@@ -150,10 +162,10 @@ export const devineParty: PartyGame<DevineState> = {
     const teams: string[][] = [];
     for (let i = 0; i < order.length; i += 2) teams.push(order.slice(i, i + 2));
     if (teams.length > 1 && teams[teams.length - 1].length === 1) teams[teams.length - 2].push(teams.pop()![0]);
-    // Chaque joueur fait deviner une fois, les équipes alternent
+    // Les équipes alternent et chacun fait deviner à son tour, sur DEVINE_TURNS tours au moins
     const turns: [number, string][] = [];
     const most = Math.max(...teams.map((t) => t.length));
-    for (let k = 0; k < most; k++) teams.forEach((t, ti) => t[k] && turns.push([ti, t[k]]));
+    while (turns.length < Math.max(DEVINE_TURNS, members.length)) for (let k = 0; k < most; k++) teams.forEach((t, ti) => t[k] && turns.push([ti, t[k]]));
     const words = shuffle([...DEVINE_WORDS.keys()], r);
     return { teams, points: teams.map(() => 0), turns, t: 0, words, w: 0, turnEndsAt: now + DEVINE_TURN_MS, feed: [], found: [], endedAt: null };
   },
@@ -184,7 +196,8 @@ export const devineParty: PartyGame<DevineState> = {
     const text = String(action.text ?? "").trim().slice(0, 120);
     if (action.type === "clue" || action.type === "skip") {
       if (userId !== teller) throw new GameError("not_your_turn", "Ce n'est pas à toi de faire deviner.");
-      if (action.type === "skip") return { ...s, w: s.w + 1, points: s.points.map((p, i) => (i === team ? Math.max(0, p - 1) : p)), feed: [...s.feed, { by: userId, text: "", kind: "skip" }] };
+      // Passer coûte un point, même à 0 (le score affiché ne descend pas sous 0)
+      if (action.type === "skip") return { ...s, w: s.w + 1, points: s.points.map((p, i) => (i === team ? p - 1 : p)), feed: [...s.feed, { by: userId, text: "", kind: "skip" }] };
       if (!text) throw new GameError("empty");
       // Mots interdits et mot à deviner bloqués, dans les deux langues
       const tokens = norm(text).split(/\s+/);
@@ -200,8 +213,11 @@ export const devineParty: PartyGame<DevineState> = {
     if (!ok) return { ...s, feed: [...s.feed, { by: userId, text, kind: "guess" }] };
     return { ...s, w: s.w + 1, points: s.points.map((p, i) => (i === team ? p + 1 : p)), found: [...s.found, word.fr.word], feed: [...s.feed, { by: userId, text, kind: "found" }] };
   },
-  tick(s, now) {
-    if (s.endedAt || now <= s.turnEndsAt) return s;
+  tick(s, now, present) {
+    if (s.endedAt) return s;
+    // Celui qui fait deviner est parti : on passe au tour suivant
+    const gone = present && !present.includes(s.turns[s.t]?.[1]);
+    if (!gone && now <= s.turnEndsAt) return s;
     const t = s.t + 1;
     if (t >= s.turns.length) return { ...s, endedAt: now };
     return { ...s, t, w: s.w + 1, turnEndsAt: now + DEVINE_TURN_MS, feed: [] };
@@ -211,7 +227,7 @@ export const devineParty: PartyGame<DevineState> = {
   },
   scoreOf(s, userId) {
     const i = s.teams.findIndex((t) => t.includes(userId));
-    return i >= 0 ? s.points[i] * 100 : 0;
+    return i >= 0 ? Math.max(0, s.points[i]) * 100 : 0;
   }
 };
 

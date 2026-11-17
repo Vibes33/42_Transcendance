@@ -14,6 +14,7 @@ import type {
   ShopItem
 } from "@loltr/shared";
 import { get, post } from "./client";
+import { useLang } from "../i18n";
 
 // Requêtes de lecture (react-query) et clés d'invalidation, une par ressource des services.
 
@@ -97,7 +98,9 @@ export interface StatsData {
 export const useSession = () => useQuery({ queryKey: keys.session, queryFn: () => get<SessionInfo>("/api/auth/session"), staleTime: 60_000 });
 
 export function useProfile(enabled = true) {
-  return useQuery({ queryKey: keys.profile, queryFn: () => get<Profile>("/api/profil/me"), enabled });
+  // Langue et thème de l'appareil : repris à la création du profil (premier passage) au lieu des valeurs par défaut
+  const prefs = () => `?lang=${useLang.getState().lang}&mode=${document.documentElement.classList.contains("light") ? "clair" : "sombre"}`;
+  return useQuery({ queryKey: keys.profile, queryFn: () => get<Profile>("/api/profil/me" + prefs()), enabled });
 }
 
 export const useDaily = () => useQuery({ queryKey: keys.daily, queryFn: () => get<DailyState>("/api/jeux/daily"), refetchInterval: 60_000 });
@@ -109,7 +112,7 @@ export const useLeaderboard = (scope: "mondial" | "copains", period: "jour" | "s
   useQuery({ queryKey: keys.leaderboard(scope, period), queryFn: () => get<Leaderboard>(`/api/classement/leaderboard?scope=${scope}&period=${period}`), enabled });
 
 export const useHistory = (enabled = true) =>
-  useQuery({ queryKey: keys.history, queryFn: async () => (await get<{ days: HistoryDay[] }>("/api/classement/history?limit=60")).days, enabled });
+  useQuery({ queryKey: keys.history, queryFn: () => get<{ days: HistoryDay[]; totals: { days: number; points: number; best: number } }>("/api/classement/history?limit=60"), enabled });
 
 export const useShop = () => useQuery({ queryKey: keys.shop, queryFn: () => get<ShopData>("/api/classement/shop") });
 

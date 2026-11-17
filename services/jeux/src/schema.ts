@@ -28,6 +28,8 @@ export const rounds = sqliteTable(
     game: text("game").notNull(),
     context: text("context", { enum: ["defi", "classique", "streamer"] }).notNull(),
     sessionId: text("session_id"),
+    /** Graine d'une manche de stream : la même manche se reprend au lieu d'être refaite. */
+    seed: text("seed"),
     state: text("state", { mode: "json" }).notNull(),
     startedAt: integer("started_at").notNull(),
     over: integer("over", { mode: "boolean" }).notNull().default(false),

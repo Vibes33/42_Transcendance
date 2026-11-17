@@ -23,6 +23,16 @@ for await (const file of new Glob("src/**/*.{ts,tsx}").scan(".")) {
 }
 for (const n of ["jour", "jours", "essai", "essais", "skin", "skins", "skin à collectionner", "skins à collectionner"]) found.add("{n} " + n);
 
+// Messages d'erreur des services (fail(…, "code", "message") et GameError("code", "message")) : ils
+// s'affichent tels quels dans l'interface. Les messages construits avec des variables (`…${x}…`)
+// ne se traduisent pas : l'interface affiche alors le texte associé au code (src/api/client.ts).
+const serverRe = /(?:fail\(\d+,\s*"[a-z_]+"|GameError\("[a-z_]+")\s*,\s*"((?:[^"\\]|\\.)*)"/g;
+for (const dir of ["../../services", "../../packages"])
+  for await (const file of new Glob("**/src/**/*.ts").scan(dir)) {
+    if (file.includes(".test.") || file.includes("node_modules")) continue;
+    for (const m of (await Bun.file(dir + "/" + file).text()).matchAll(serverRe)) found.add(JSON.parse(`"${m[1]}"`));
+  }
+
 const missing = [...found].filter((s) => !(s in EN)).sort();
 if (process.argv.includes("--json")) console.log(JSON.stringify(missing, null, 1));
 else {

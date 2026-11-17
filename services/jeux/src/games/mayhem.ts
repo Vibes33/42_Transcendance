@@ -94,6 +94,8 @@ export const mayhem: GameEngine<MayhemState> = {
         if (!base) throw new GameError("bad_crest", "Écusson inconnu.");
         if (name.length < 2) throw new GameError("bad_name", "Donne un nom d’au moins 2 caractères à ton équipe.");
         if (s.locked) throw new GameError("locked", "Ton équipe est déjà validée.");
+        // L'écusson se choisit avant le draft : changé ensuite, il ajusterait la note aux joueurs pris
+        if (Object.keys(s.picks).length > 0 && s.crest?.id !== base.id) throw new GameError("crest_locked", "L’écusson se choisit avant le draft.");
         return { state: { ...s, crest: { ...base, name } }, feedback: {} };
       }
       case "pick": {

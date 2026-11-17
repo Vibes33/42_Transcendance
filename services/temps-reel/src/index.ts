@@ -15,10 +15,10 @@ const store: Store = {
 
 const hub = new Hub({
   store,
-  players: (ids) => (ids.length ? internal<PublicPlayer[]>("profil", `/api/profil/internal/players?ids=${ids.join(",")}`) : Promise.resolve([])),
+  players: (ids) => (ids.length ? internal<PublicPlayer[]>("profil", "/api/profil/internal/players", { body: { ids } }) : Promise.resolve([])),
   groupOf: (userId) => internal<{ id: string; leader: string; members: string[] } | null>("social", `/api/social/internal/group-of/${userId}`),
   friendsOf: async (userId) => (await internal<{ ids: string[] }>("social", `/api/social/internal/friends/${userId}`)).ids,
-  projections: (ids, day) => internal("classement", `/api/classement/internal/projections?ids=${ids.join(",")}&day=${day}`),
+  projections: (ids, day) => internal("classement", "/api/classement/internal/projections", { body: { ids, day } }),
   forfeit: async (userId, day, upTo) => {
     await internal("jeux", "/api/jeux/internal/forfeit", { body: { userId, day, upTo } });
   }

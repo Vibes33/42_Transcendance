@@ -95,7 +95,8 @@ export function Profil() {
       if (!/^[a-zA-Z]$/.test(e.key)) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
-      if (vitrine) return;
+      // Profil pas encore chargé : `jump` n'est défini qu'après le chargement (plus bas)
+      if (vitrine || !me.profile) return;
       e.preventDefault();
       jump(e.key.toUpperCase());
     };

@@ -29,6 +29,11 @@ export const useLang = create<{ lang: SiteLang; setLang: (l: SiteLang) => void }
 
 type Params = Record<string, string | number>;
 
+/** Le texte français a-t-il sa version dans la langue du site ? */
+export function hasTranslation(fr: string): boolean {
+  return useLang.getState().lang === "fr" || fr in EN;
+}
+
 export function translate(lang: SiteLang, fr: string, params?: Params): string {
   let s = lang === "en" ? (EN[fr] ?? fr) : fr;
   if (params) for (const [k, v] of Object.entries(params)) s = s.split("{" + k + "}").join(String(v));

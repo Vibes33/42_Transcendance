@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
+import { serverNow } from "../api/client";
 import { t } from "../i18n";
 
-/** Heure courante, rafraîchie à intervalle régulier (chronos, comptes à rebours). */
+/**
+ * Heure courante du serveur (horloge du joueur corrigée), rafraîchie à intervalle régulier : les
+ * chronos et comptes à rebours se comparent à des instants donnés par le serveur.
+ */
 export function useNow(intervalMs = 1000): number {
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(() => serverNow());
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    const id = setInterval(() => setNow(serverNow()), intervalMs);
     return () => clearInterval(id);
   }, [intervalMs]);
   return now;

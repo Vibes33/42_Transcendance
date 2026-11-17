@@ -29,12 +29,13 @@ export function pseudoSuggestions(p: string): string[] {
   return [p + "_TR", p + tagOf(p).slice(-2), p + "Main", "Le" + p].filter((x) => x.length <= PSEUDO_MAX);
 }
 
-const ADJ = ["Rapide", "Rusé", "Brave", "Malin", "Vif", "Fier", "Discret", "Agile"];
-const NOUNS = ["Poro", "Baron", "Herald", "Minion", "Drake", "Krug", "Gromp", "Wolf"];
+// 16 × 16 × 900 = 230 400 combinaisons, 16 caractères au plus (nom ≤ 6, adjectif ≤ 7, 3 chiffres).
+const ADJ = ["Rapide", "Rusé", "Brave", "Malin", "Vif", "Fier", "Discret", "Agile", "Calme", "Sage", "Fou", "Furtif", "Hardi", "Tenace", "Loyal", "Zen"];
+const NOUNS = ["Poro", "Baron", "Herald", "Minion", "Drake", "Krug", "Gromp", "Wolf", "Raptor", "Ward", "Golem", "Nexus", "Tower", "Elder", "Rift", "Shard"];
 
 /** Pseudo aléatoire pour les invités et les spectateurs d'un stream. */
 export function randomPseudo(r: () => number = Math.random): string {
   const a = ADJ[Math.floor(r() * ADJ.length)];
   const n = NOUNS[Math.floor(r() * NOUNS.length)];
-  return n + a + Math.floor(r() * 90 + 10);
+  return n + a + Math.floor(r() * 900 + 100);
 }

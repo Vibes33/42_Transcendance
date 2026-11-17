@@ -21,8 +21,11 @@ export function callerFrom(headers: Record<string, string | undefined>): Caller 
 }
 
 export class HttpError extends Error {
+  /** Message pour le joueur ; sans lui, l'interface affiche le texte associé au code. */
+  public readonly userMessage: string | undefined;
   constructor(public status: number, public code: string, message?: string) {
     super(message ?? code);
+    this.userMessage = message;
   }
 }
 
@@ -36,7 +39,7 @@ export const callerPlugin = new Elysia({ name: "loltr-caller" })
   .onError({ as: "global" }, ({ code, error, set }) => {
     if (error instanceof HttpError) {
       set.status = error.status;
-      return { error: error.code, message: error.message };
+      return { error: error.code, message: error.userMessage };
     }
     if (code === "PARSE") {
       set.status = 400;
@@ -53,6 +56,10 @@ export const callerPlugin = new Elysia({ name: "loltr-caller" })
     console.error(error);
     set.status = 500;
     return { error: "internal" };
+  })
+  // Heure du serveur : l'interface corrige l'horloge du joueur pour ses chronos
+  .onRequest(({ set }) => {
+    set.headers["x-server-time"] = String(Date.now());
   })
   .derive({ as: "global" }, ({ headers }) => ({ caller: callerFrom(headers) }));
 

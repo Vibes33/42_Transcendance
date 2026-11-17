@@ -106,7 +106,18 @@ export function createSocialApp(deps: SocialDeps) {
     await deps.publish("group.updated", { groupId: g.id, members: [u], leader: "", disbanded: true });
   }
 
-  return new Elysia({ prefix: "/api/social" })
+  /** Compte supprimé : il quitte son groupe, ses amitiés, demandes, blocages et invitations disparaissent. */
+  async function forget(u: string) {
+    await leaveGroup(u);
+    db.transaction((tx) => {
+      tx.delete(friendships).where(or(eq(friendships.userA, u), eq(friendships.userB, u))).run();
+      tx.delete(friendRequests).where(or(eq(friendRequests.fromId, u), eq(friendRequests.toId, u))).run();
+      tx.delete(blocks).where(or(eq(blocks.blocker, u), eq(blocks.blocked, u))).run();
+      tx.delete(groupMembers).where(eq(groupMembers.userId, u)).run();
+    });
+  }
+
+  const app = new Elysia({ prefix: "/api/social" })
     .use(callerPlugin)
     .use(health)
     .get("/friends", async ({ caller }) => {
@@ -299,6 +310,8 @@ export function createSocialApp(deps: SocialDeps) {
         if (!m) fail(409, "no_group");
         const g = groupRaw(m!.groupId)!;
         if (g.leader !== me) fail(403, "not_leader", "Seul le chef du groupe peut retirer un joueur.");
+        // Le chef qui veut partir quitte le groupe (un nouveau chef est désigné) : il ne s'exclut pas
+        if (body.userId === me) fail(400, "self", "Pour partir, quitte le groupe.");
         db.delete(groupMembers).where(and(eq(groupMembers.groupId, g.id), eq(groupMembers.userId, body.userId))).run();
         await announceGroup(g.id);
         await deps.publish("group.updated", { groupId: g.id, members: [body.userId], leader: "", disbanded: true });
@@ -315,14 +328,7 @@ export function createSocialApp(deps: SocialDeps) {
           const g = m ? groupRaw(m.groupId) : null;
           return g ? { id: g.id, leader: g.leader, members: g.members.filter((x) => x.status === "member").map((x) => x.userId) } : null;
         })
-        .get(
-          "/friends-of-many",
-          ({ query }) => {
-            const ids = query.ids.split(",").filter(Boolean);
-            return Object.fromEntries(ids.map((id) => [id, friendIds(id)]));
-          },
-          { query: t.Object({ ids: t.String() }) }
-        )
+        .post("/friends-of-many", ({ body }) => Object.fromEntries(body.ids.map((id) => [id, friendIds(id)])), { body: t.Object({ ids: t.Array(t.String()) }) })
     );
+  return Object.assign(app, { forget });
 }
-

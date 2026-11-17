@@ -17,6 +17,8 @@ export interface EventMap {
   /** auth : un invité vient de se connecter avec un compte. */
   "user.merged": { guestId: string; userId: string; day: string };
   "user.created": { userId: string; kind: "user" | "guest" };
+  /** auth : compte supprimé (RGPD) ; chaque service efface ce qu'il garde de ce joueur. */
+  "user.deleted": { userId: string };
   /** profil : pseudo ou chibi modifié. */
   "profile.updated": { userId: string; pseudo: string; tag: string; avatar: string; chibi: string };
   /** social */
@@ -46,8 +48,12 @@ export interface EventMap {
     sessionId: string | null;
     result: RoundResult;
     basePoints: number;
+    /** Graine de la manche (stream : « graine:manche:jeu »). */
+    seed?: string | null;
   };
-  "defi.completed": { userId: string; day: string };
+  "defi.completed": { userId: string; day: string; kind?: "user" | "guest" };
+  /** jeux : défi d'un invité transféré à son compte (un événement par jour transféré). */
+  "defi.merged": { guestId: string; userId: string; day: string };
   /** classement */
   "points.updated": { userId: string; day: string; projected: number };
   "wallet.updated": { userId: string; balance: number };

@@ -1,12 +1,9 @@
 # Configuration statique de Traefik : reverse proxy + passerelle API de LolTR.
 entryPoints:
+  # HTTP → HTTPS : redirection dans la configuration dynamique (middleware to-https), pour viser le
+  # port HTTPS publié sur l'hôte (8443 en local) et non le port 443 du conteneur
   web:
     address: ":80"
-    http:
-      redirections:
-        entryPoint:
-          to: websecure
-          scheme: https
   websecure:
     address: ":443"
     http:

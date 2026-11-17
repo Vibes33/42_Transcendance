@@ -86,11 +86,16 @@ export function compareResults(a: RoundResult, b: RoundResult): number {
   }
 }
 
-/** Part des meilleurs joueurs (0 < top ≤ 1) : rang / effectif, à égalité on prend le meilleur rang. */
+/**
+ * Part des joueurs strictement meilleurs (0 ≤ top < 1) : le premier vaut 0, donc le meilleur palier
+ * quel que soit l'effectif (même seul), et les ex aequo partagent le meilleur rang.
+ */
+export function topOf(better: number, total: number): number {
+  return total > 0 ? better / total : 1;
+}
+
 export function topFraction<T extends RoundResult>(mine: T, all: T[]): number {
-  if (all.length === 0) return 1;
-  const better = all.filter((x) => compareResults(x, mine) < 0).length;
-  return (better + 1) / all.length;
+  return topOf(all.filter((x) => compareResults(x, mine) < 0).length, all.length);
 }
 
 /** Points bonus (0 à 150) selon le palier de percentile. */

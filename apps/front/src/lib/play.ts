@@ -1,5 +1,5 @@
 import type { NavigateFunction } from "react-router-dom";
-import type { GameKey, LiveSession } from "@loltr/shared";
+import { GAMES, type GameKey, type LiveSession } from "@loltr/shared";
 import { post } from "../api/client";
 import { keys, queryClient } from "../api/queries";
 import { useLive } from "../state/live";
@@ -26,6 +26,15 @@ export async function startDefiSolo(nav: NavigateFunction, status?: string) {
   }
 }
 
+/** Pourquoi ce groupe ne peut pas lancer ce jeu, ou null s'il le peut. */
+export function groupBlock(game: GameKey, size: number): string | null {
+  const m = GAMES[game];
+  if (!m.modes.includes("groupe")) return t("Ce jeu se joue seul.");
+  if (size < m.minPlayers) return t("Il faut au moins {n} joueurs pour ce jeu.", { n: m.minPlayers });
+  if (size > m.maxPlayers) return t("Ce jeu se joue à {n} au plus.", { n: m.maxPlayers });
+  return null;
+}
+
 /**
  * Partie avec des amis : il faut un groupe avec au moins un autre joueur. Le service temps réel
  * inscrit tout le groupe ; chacun est emmené sur la partie par la connexion temps réel.
@@ -38,6 +47,9 @@ export async function startGroup(
   if (!opts.isUser) return ui.askLogin("amis");
   if (!opts.inGroup) return ui.setNeedGroup("aucun");
   if (opts.mates === 0) return ui.setNeedGroup("vide");
+  // Nombre de joueurs et modes du jeu (manifeste) : le serveur refuse aussi, on prévient avant
+  const why = opts.game ? groupBlock(opts.game, opts.mates + 1) : null;
+  if (why) return ui.toast(why, "danger");
   // Chaque jour, le défi se fait en solo OU en groupe
   if (opts.context === "defi" && opts.dailyMode === "solo") return ui.toast(t("Tu as déjà commencé le défi du jour en solo."), "danger");
   try {

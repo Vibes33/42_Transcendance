@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import sharp from "sharp";
 import { CHAMPION_BY_ID } from "@loltr/content";
 import { CDJ_MAX_TRIES, dayKey } from "@loltr/shared";
 import { createJeuxApp } from "./app";
@@ -7,7 +8,7 @@ import { compare } from "./games/cdj";
 import { ENGINES } from "./games";
 import { rotationFor } from "@loltr/shared";
 
-function setup(opts: { owned?: Record<string, string[]>; t0?: number } = {}) {
+function setup(opts: { owned?: Record<string, string[]>; t0?: number; fetchImage?: (url: string) => Promise<Response> } = {}) {
   let t = opts.t0 ?? Date.UTC(2026, 9, 21, 12, 0, 0);
   const events: { type: string; data: any }[] = [];
   const app = createJeuxApp({
@@ -17,6 +18,7 @@ function setup(opts: { owned?: Record<string, string[]>; t0?: number } = {}) {
     groupOf: async () => null,
     session: async (id) => (id === "g1" ? { kind: "group", seed: "s", members: ["u1", "u2"] } : null),
     projection: async () => ({}),
+    fetchImage: opts.fetchImage,
     now: () => t
   });
   const call = async (path: string, user: string, init: RequestInit = {}, kind = "user", device = "dev-1") => {
@@ -229,5 +231,25 @@ describe("World Mayhem", () => {
     expect(day.total).toBe(1);
     expect(day.best.score).toBe(day.best.rating);
     expect(day.best.team.map((p: any) => p.role)).toEqual(["top", "jgl", "mid", "adc", "sup"]);
+  });
+});
+
+describe("Splash mystère : image", () => {
+  test("seule la zone zoomée est servie pendant la manche, l'image entière à la fin", async () => {
+    const W = 1215;
+    const H = 717;
+    const art = await sharp({ create: { width: W, height: H, channels: 3, background: "#3366aa" } }).jpeg().toBuffer();
+    const { app, post } = setup({ owned: { u1: ["game:splash"] }, fetchImage: async () => new Response(new Uint8Array(art), { headers: { "content-type": "image/jpeg" } }) });
+    const r = (await post("/rounds", "u1", { game: "splash", context: "classique" })).body;
+    const image = async () => {
+      const res = await app.handle(new Request(`http://localhost/api/jeux/rounds/${r.id}/image/0`, { headers: { "x-user-id": "u1", "x-user-kind": "user" } }));
+      return sharp(Buffer.from(await res.arrayBuffer())).metadata();
+    };
+    const first = await image();
+    expect(first.width).toBe(Math.round(W / r.public.scale));
+    expect(first.height).toBe(Math.round(H / r.public.scale));
+    await post(`/rounds/${r.id}/finish`, "u1", { quit: true });
+    const end = await image();
+    expect([end.width, end.height]).toEqual([W, H]);
   });
 });

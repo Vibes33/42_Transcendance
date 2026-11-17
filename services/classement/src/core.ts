@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
 import {
   DAILY_UNLOCKS,
   GAMES,
@@ -7,19 +7,21 @@ import {
   SPLASH_CHAMPION_POINTS,
   addDays,
   bonusPoints,
+  compareResults,
   dayKey,
+  daysBetween,
   forceCloseAt,
   hasPerformance,
   rankFor,
   seasonOf,
-  topFraction,
+  topOf,
   rotationFor,
   weekKey,
   type GameKey,
   type RoundResult
 } from "@loltr/shared";
 import type { Db } from "./db";
-import { community, days, finalizedDays, inventory, ledger, paidSeasons, results, seasonPoints, streaks, wallets, weeks } from "./schema";
+import { community, communityRounds, days, finalizedDays, inventory, ledger, paidSeasons, results, seasonPoints, streaks, wallets, weeks } from "./schema";
 
 // Règles de points et d'éclats (sections 8 et 9 du cahier des charges).
 
@@ -49,7 +51,7 @@ export interface GameProjection {
   base: number;
   bonus: number;
   projected: number;
-  /** Part des meilleurs joueurs du jour sur ce jeu (0 < top ≤ 1). */
+  /** Part des joueurs du jour meilleurs que lui sur ce jeu (0 ≤ top < 1). */
   top: number;
   /** Performance classable : sinon pas de bonus de percentile. */
   ranked: boolean;
@@ -57,14 +59,50 @@ export interface GameProjection {
   players: number;
 }
 
+// Résultats du jour par jeu, triés du meilleur au moins bon, gardés en mémoire jusqu'au prochain
+// changement : un percentile se lit alors par recherche dichotomique au lieu de tout reparcourir.
+const sortedCache = new WeakMap<object, { version: number; byKey: Map<string, RoundResult[]> }>();
+const versions = new WeakMap<object, number>();
+
+/** À appeler après tout ajout, déplacement ou effacement de résultats. */
+export function resultsChanged(db: Db) {
+  versions.set(db, (versions.get(db) ?? 0) + 1);
+}
+
+function sortedResults(db: Db, day: string, game: string): RoundResult[] {
+  const version = versions.get(db) ?? 0;
+  let c = sortedCache.get(db);
+  if (!c || c.version !== version) sortedCache.set(db, (c = { version, byKey: new Map() }));
+  const key = day + ":" + game;
+  let list = c.byKey.get(key);
+  if (!list) {
+    list = db.select({ result: results.result }).from(results).where(and(eq(results.day, day), eq(results.game, game))).all().map((x) => x.result as RoundResult);
+    list.sort(compareResults);
+    c.byKey.set(key, list);
+  }
+  return list;
+}
+
+/** Nombre de résultats strictement meilleurs que `me` dans une liste triée. */
+function betterThan(sorted: RoundResult[], me: RoundResult): number {
+  let lo = 0;
+  let hi = sorted.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (compareResults(sorted[mid], me) < 0) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
 /** Bonus prévisionnel par jeu : percentile du joueur parmi tous les résultats du jour pour ce jeu. */
 export function projection(db: Db, userId: string, day: string): Record<string, GameProjection> {
   const mine = db.select().from(results).where(and(eq(results.userId, userId), eq(results.day, day))).all();
   const out: Record<string, GameProjection> = {};
   for (const r of mine) {
-    const all = db.select({ result: results.result }).from(results).where(and(eq(results.day, day), eq(results.game, r.game))).all().map((x) => x.result as RoundResult);
+    const all = sortedResults(db, day, r.game);
     const me = r.result as RoundResult;
-    const top = topFraction(me, all);
+    const top = topOf(betterThan(all, me), all.length);
     const ranked = hasPerformance(me);
     const bonus = bonusPoints(top, ranked);
     out[r.game] = { base: r.basePoints, bonus, projected: r.basePoints + bonus, top, ranked, players: all.length };
@@ -87,12 +125,22 @@ export function history(db: Db, userId: string, limit: number) {
   });
 }
 
+/** Bilan sur toutes les journées jouées (l'historique affiché, lui, est limité aux plus récentes). */
+export function historyTotals(db: Db, userId: string) {
+  const all = db.select().from(days).where(eq(days.userId, userId)).all();
+  const totals = all.map((d) => (d.finalTotal !== null ? d.finalTotal : projectedTotal(db, userId, d.day)));
+  return { days: all.length, points: totals.reduce((a, b) => a + b, 0), best: Math.max(0, ...totals) };
+}
+
 export function projectedTotal(db: Db, userId: string, day: string): number {
   return Object.values(projection(db, userId, day)).reduce((s, g) => s + g.projected, 0);
 }
 
-/** Une manche du défi du jour terminée. */
-export function recordResult(db: Db, ev: { userId: string; kind: "user" | "guest"; day: string; game: GameKey; result: RoundResult; basePoints: number }, at: number) {
+const isFinalized = (db: Db | Tx, day: string) => !!db.select().from(finalizedDays).where(eq(finalizedDays.day, day)).get();
+
+/** Une manche du défi du jour terminée. Ignorée si le jour est déjà soldé (3 h 30 passé). */
+export function recordResult(db: Db, ev: { userId: string; kind: "user" | "guest"; day: string; game: GameKey; result: RoundResult; basePoints: number }, at: number): boolean {
+  if (isFinalized(db, ev.day)) return false;
   db.transaction((tx) => {
     tx.insert(results)
       .values({ userId: ev.userId, day: ev.day, game: ev.game, kind: ev.kind, result: ev.result, basePoints: ev.basePoints, finishedAt: at })
@@ -102,27 +150,43 @@ export function recordResult(db: Db, ev: { userId: string; kind: "user" | "guest
     // À confirmer (section 17) : 30 éclats pour un Champion du jour trouvé
     if (ev.game === "cdj" && ev.result.found && SHARDS.cdjFound > 0) credit(tx, ev.userId, SHARDS.cdjFound, "cdj_found", ev.day, at);
   });
+  resultsChanged(db);
+  return true;
+}
+
+/**
+ * Le jour passe à « terminé » : 10 éclats, série, semaine et bonus hebdomadaire. Ne fait rien si le
+ * jour l'était déjà (événement rejoué ou reçu en double) : la semaine n'est comptée qu'une fois.
+ */
+function completeDay(tx: Tx, userId: string, day: string, kind: "user" | "guest", at: number): boolean {
+  const ch = tx
+    .insert(days)
+    .values({ userId, day, kind, completed: true })
+    .onConflictDoUpdate({ target: [days.userId, days.day], set: { completed: true }, where: eq(days.completed, false) })
+    .run() as unknown as { changes: number };
+  if (ch.changes === 0) return false;
+  credit(tx, userId, SHARDS.dailyCompleted, "daily_completed", day, at);
+  const s = tx.select().from(streaks).where(eq(streaks.userId, userId)).get();
+  if (!s) tx.insert(streaks).values({ userId, current: 1, best: 1, lastDay: day }).run();
+  // Un jour plus ancien que le dernier jour compté ne touche pas à la série
+  else if (!s.lastDay || s.lastDay < day) {
+    const current = s.lastDay === addDays(day, -1) ? s.current + 1 : 1;
+    tx.update(streaks).set({ current, best: Math.max(s.best, current), lastDay: day }).where(eq(streaks.userId, userId)).run();
+  }
+  const week = weekKey(day);
+  tx.insert(weeks)
+    .values({ userId, week, completed: 1 })
+    .onConflictDoUpdate({ target: [weeks.userId, weeks.week], set: { completed: sql`${weeks.completed} + 1` } })
+    .run();
+  const w = tx.select().from(weeks).where(and(eq(weeks.userId, userId), eq(weeks.week, week))).get()!;
+  if (w.completed >= SHARDS.weeklyBonus.minDays) credit(tx, userId, SHARDS.weeklyBonus.shards, "weekly_bonus", week, at);
+  return true;
 }
 
 /** Défi du jour terminé : 10 éclats, série, et 50 éclats au 5e défi de la semaine. */
-export function recordCompleted(db: Db, userId: string, day: string, at: number) {
-  db.transaction((tx) => {
-    tx.update(days).set({ completed: true }).where(and(eq(days.userId, userId), eq(days.day, day))).run();
-    credit(tx, userId, SHARDS.dailyCompleted, "daily_completed", day, at);
-    const s = tx.select().from(streaks).where(eq(streaks.userId, userId)).get();
-    if (!s) tx.insert(streaks).values({ userId, current: 1, best: 1, lastDay: day }).run();
-    else if (s.lastDay !== day) {
-      const current = s.lastDay === addDays(day, -1) ? s.current + 1 : 1;
-      tx.update(streaks).set({ current, best: Math.max(s.best, current), lastDay: day }).where(eq(streaks.userId, userId)).run();
-    }
-    const week = weekKey(day);
-    tx.insert(weeks)
-      .values({ userId, week, completed: 1 })
-      .onConflictDoUpdate({ target: [weeks.userId, weeks.week], set: { completed: sql`${weeks.completed} + 1` } })
-      .run();
-    const w = tx.select().from(weeks).where(and(eq(weeks.userId, userId), eq(weeks.week, week))).get()!;
-    if (w.completed >= SHARDS.weeklyBonus.minDays) credit(tx, userId, SHARDS.weeklyBonus.shards, "weekly_bonus", week, at);
-  });
+export function recordCompleted(db: Db, userId: string, day: string, at: number, kind: "user" | "guest" = "user"): boolean {
+  if (isFinalized(db, day)) return false;
+  return db.transaction((tx) => completeDay(tx, userId, day, kind, at));
 }
 
 /** Série en cours : remise à zéro si le joueur a manqué un jour. */
@@ -137,7 +201,7 @@ export function streakOf(db: Db, userId: string, today: string): { current: numb
  * Clôt les jours passés (après 3 h 30, pour inclure les défis finis en retard) :
  * bonus de percentile définitifs, points de saison, 10 éclats par tranche de 500 points.
  */
-export function finalizeDays(db: Db, now: number): string[] {
+export function finalizeDays(db: Db, now: number, credited?: Set<string>): string[] {
   const today = dayKey(now);
   const pending = db
     .selectDistinct({ day: days.day })
@@ -159,7 +223,7 @@ export function finalizeDays(db: Db, now: number): string[] {
             .onConflictDoUpdate({ target: [seasonPoints.userId, seasonPoints.season], set: { points: sql`${seasonPoints.points} + ${total}`, daysPlayed: sql`${seasonPoints.daysPlayed} + 1` } })
             .run();
         const chunks = Math.floor(total / 500);
-        if (chunks > 0) credit(tx, p.userId, chunks * SHARDS.per500Points, "points_500", day, now);
+        if (chunks > 0 && credit(tx, p.userId, chunks * SHARDS.per500Points, "points_500", day, now)) credited?.add(p.userId);
       }
       tx.insert(finalizedDays).values({ day, at: now }).run();
     });
@@ -167,7 +231,10 @@ export function finalizeDays(db: Db, now: number): string[] {
   return pending;
 }
 
-/** Fin de saison : éclats du classement mondial et du classement copains (environ 3 fois moins). */
+/**
+ * Saisons à payer : finies, et dont tous les jours sont soldés (le dernier jour reste jouable
+ * jusqu'à 3 h 30 le premier jour de la saison suivante).
+ */
 export function seasonsToPay(db: Db, now: number): number[] {
   const current = seasonOf(dayKey(now)).number;
   return db
@@ -176,23 +243,40 @@ export function seasonsToPay(db: Db, now: number): number[] {
     .where(lt(seasonPoints.season, current))
     .all()
     .map((r) => r.s)
-    .filter((s) => !db.select().from(paidSeasons).where(eq(paidSeasons.season, s)).get());
+    .filter((s) => {
+      if (db.select().from(paidSeasons).where(eq(paidSeasons.season, s)).get()) return false;
+      const cur = seasonOf(dayKey(now));
+      const len = daysBetween(cur.startKey, cur.endKey) + 1;
+      const start = addDays(cur.startKey, -(current - s) * len);
+      const end = addDays(start, len - 1);
+      if (now < forceCloseAt(end)) return false;
+      return !db
+        .selectDistinct({ day: days.day })
+        .from(days)
+        .where(and(gt(days.day, addDays(start, -1)), lt(days.day, addDays(end, 1))))
+        .all()
+        .some((d) => !isFinalized(db, d.day));
+    });
 }
 
 export function seasonPlayers(db: Db, season: number): string[] {
   return db.select({ u: seasonPoints.userId }).from(seasonPoints).where(eq(seasonPoints.season, season)).all().map((r) => r.u);
 }
 
-export function paySeasons(db: Db, now: number, friends: Record<string, string[]>): number[] {
+export function paySeasons(db: Db, now: number, friends: Record<string, string[]>, credited?: Set<string>): number[] {
   const paid: number[] = [];
   for (const season of seasonsToPay(db, now)) {
-    const rows = db.select().from(seasonPoints).where(eq(seasonPoints.season, season)).orderBy(desc(seasonPoints.points)).all();
+    // Seuls les joueurs avec des points sont payés ; des ex aequo partagent le même rang (et le même palier)
+    const rows = db.select().from(seasonPoints).where(and(eq(seasonPoints.season, season), gt(seasonPoints.points, 0))).orderBy(desc(seasonPoints.points)).all();
     const pts = Object.fromEntries(rows.map((r) => [r.userId, r]));
+    const ranks: number[] = [];
+    rows.forEach((r, i) => ranks.push(i > 0 && r.points === rows[i - 1].points ? ranks[i - 1] : i));
     db.transaction((tx) => {
       rows.forEach((r, i) => {
-        const tier = SHARDS.seasonGlobal.find((t) => i < t.top);
+        const tier = SHARDS.seasonGlobal.find((t) => ranks[i] < t.top);
         if (tier) credit(tx, r.userId, tier.shards, "season_global", String(season), now);
         else if (r.daysPlayed >= SHARDS.seasonGlobalParticipation.minDays) credit(tx, r.userId, SHARDS.seasonGlobalParticipation.shards, "season_global", String(season), now);
+        credited?.add(r.userId);
         // Copains : seulement avec au moins 4 copains actifs cette saison
         const circle = (friends[r.userId] ?? []).filter((f) => pts[f]?.daysPlayed > 0);
         if (circle.length >= SHARDS.seasonFriendsMinActive) {
@@ -220,7 +304,7 @@ export function rankOf(db: Db, userId: string, season: number, now: number, poin
   const all = [...points.values()].filter((p) => p > 0);
   if (mine <= 0 || all.length === 0) return { ...rankFor(1), position: null as number | null, total: all.length, points: mine, daysPlayed };
   const better = all.filter((p) => p > mine).length;
-  return { ...rankFor((better + 1) / all.length), position: better + 1, total: all.length, points: mine, daysPlayed };
+  return { ...rankFor(topOf(better, all.length)), position: better + 1, total: all.length, points: mine, daysPlayed };
 }
 
 /** Points d'un ensemble de joueurs sur une période (définitifs + aujourd'hui en prévisionnel). */
@@ -239,24 +323,53 @@ export function periodPoints(db: Db, ids: string[] | null, period: Period, now: 
   return out;
 }
 
-/** Fusion invité → compte : la journée de l'invité et ses éclats passent au compte, sauf si le compte a déjà joué. */
+/**
+ * Fusion invité → compte d'un jour donné, décidée par le service jeux (événement `defi.merged`) :
+ * résultats, journée, éclats du jour, série et semaine passent au compte. Refusée si le compte a
+ * déjà des résultats ce jour-là.
+ */
 export function mergeGuest(db: Db, guestId: string, userId: string, day: string, at: number): boolean {
   if (db.select().from(results).where(and(eq(results.userId, userId), eq(results.day, day))).get()) return false;
+  const guestDay = db.select().from(days).where(and(eq(days.userId, guestId), eq(days.day, day))).get();
   db.transaction((tx) => {
-    tx.update(results).set({ userId, kind: "user" }).where(eq(results.userId, guestId)).run();
-    tx.update(days).set({ userId, kind: "user" }).where(eq(days.userId, guestId)).run();
-    const entries = tx.select().from(ledger).where(eq(ledger.userId, guestId)).all();
+    tx.update(results).set({ userId, kind: "user" }).where(and(eq(results.userId, guestId), eq(results.day, day))).run();
+    if (guestDay) {
+      tx.delete(days).where(and(eq(days.userId, guestId), eq(days.day, day))).run();
+      tx.insert(days).values({ userId, day, kind: "user", completed: false, finalTotal: guestDay.finalTotal }).onConflictDoNothing().run();
+    }
+    // Éclats gagnés ce jour-là (Champion du jour trouvé, tranches de points) ; le défi terminé et la
+    // semaine sont recomptés pour le compte
+    const entries = tx.select().from(ledger).where(and(eq(ledger.userId, guestId), eq(ledger.ref, day))).all();
     for (const e of entries) credit(tx, userId, e.delta, e.reason, e.ref, at);
-    tx.delete(ledger).where(eq(ledger.userId, guestId)).run();
-    tx.delete(wallets).where(eq(wallets.userId, guestId)).run();
-    const st = tx.select().from(streaks).where(eq(streaks.userId, guestId)).get();
-    if (st && !tx.select().from(streaks).where(eq(streaks.userId, userId)).get()) tx.insert(streaks).values({ ...st, userId }).run();
+    if (guestDay?.completed) completeDay(tx, userId, day, "user", at);
+    const moved = entries.reduce((a, e) => a + e.delta, 0);
+    tx.delete(ledger).where(and(eq(ledger.userId, guestId), eq(ledger.ref, day))).run();
+    tx.update(wallets).set({ balance: sql`max(0, ${wallets.balance} - ${moved})` }).where(eq(wallets.userId, guestId)).run();
   });
+  resultsChanged(db);
   return true;
 }
 
-/** Points d'une manche de stream pour le classement de la communauté du streamer. */
-export function recordCommunity(db: Db, streamerId: string, userId: string, points: number, day: string) {
+/** Compte supprimé : tout ce que le classement garde de lui est effacé. */
+export function forget(db: Db, userId: string) {
+  db.transaction((tx) => {
+    tx.delete(results).where(eq(results.userId, userId)).run();
+    tx.delete(days).where(eq(days.userId, userId)).run();
+    tx.delete(seasonPoints).where(eq(seasonPoints.userId, userId)).run();
+    tx.delete(weeks).where(eq(weeks.userId, userId)).run();
+    tx.delete(wallets).where(eq(wallets.userId, userId)).run();
+    tx.delete(ledger).where(eq(ledger.userId, userId)).run();
+    tx.delete(inventory).where(eq(inventory.userId, userId)).run();
+    tx.delete(streaks).where(eq(streaks.userId, userId)).run();
+    tx.delete(community).where(or(eq(community.userId, userId), eq(community.streamerId, userId))).run();
+  });
+  resultsChanged(db);
+}
+
+/** Points d'une manche de stream pour le classement de la communauté du streamer (une fois par manche). */
+export function recordCommunity(db: Db, streamerId: string, userId: string, points: number, day: string, roundId: string) {
+  const once = db.insert(communityRounds).values({ roundId }).onConflictDoNothing().run() as unknown as { changes: number };
+  if (once.changes === 0) return;
   const season = seasonOf(day).number;
   db.insert(community)
     .values({ streamerId, season, userId, points })

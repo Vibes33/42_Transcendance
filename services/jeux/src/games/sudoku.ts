@@ -91,8 +91,9 @@ export const sudoku: GameEngine<S> = {
       solved: s.grid.every((v, i) => v === s.solution[i]),
       startedAt: s.startedAt,
       endedAt: s.endedAt,
-      // Grille ratée : la solution se dévoile
-      solution: this.isOver(s, now) ? s.solution : null,
+      // Grille ratée (3 erreurs) : la solution se dévoile ; jamais après un simple abandon, sinon on
+      // relancerait la grille du jour pour la remplir de mémoire
+      solution: s.errors >= SUDOKU_MAX_ERRORS ? s.solution : null,
       over: this.isOver(s, now)
     };
   },
@@ -122,7 +123,7 @@ export const sudoku: GameEngine<S> = {
     return { game: "sudoku", solved: s.grid.every((v, i) => v === s.solution[i]), tries: s.errors, durationMs: (s.endedAt ?? now) - s.startedAt };
   },
   reveal(s) {
-    return { solution: s.solution };
+    return { solution: s.errors >= SUDOKU_MAX_ERRORS ? s.solution : null };
   },
   progress(s) {
     return { step: s.grid.filter((v) => v >= 0).length, tries: s.errors };

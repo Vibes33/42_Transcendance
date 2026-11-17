@@ -54,7 +54,9 @@ function make(seed: string, k: number): Question {
   if (kind === "spell") {
     const c = champ(CHAMPIONS);
     const sp = c.spells[1 + Math.floor(r() * 4)];
-    const others = pickN(r, CHAMPIONS, 3, (x) => x.id === c.id).map((x) => x.names);
+    // Un autre champion qui a un sort du même nom serait aussi une bonne réponse
+    const same = (x: Champion) => x.spells.some((s) => s.names.fr === sp.names.fr || s.names.en === sp.names.en);
+    const others = pickN(r, CHAMPIONS, 3, (x) => x.id === c.id || same(x)).map((x) => x.names);
     return finish("gameplay", { fr: `À quel champion appartient le sort « ${sp.names.fr} » ?`, en: `Which champion has the ability "${sp.names.en}"?` }, c.names, others);
   }
   if (kind === "resource") {
@@ -72,14 +74,16 @@ function make(seed: string, k: number): Question {
 
 export const qcm: GameEngine<S> = {
   key: "qcm",
-  create({ seed, now }) {
+  create({ seed, now, seen }) {
     const questions: Question[] = [];
-    for (let k = 0; questions.length < QCM_QUESTIONS && k < 60; k++) {
-      const q = make(seed, k);
-      // Pas deux fois la même question dans une partie
-      if (!questions.some((x) => x.text.fr === q.text.fr)) questions.push(q);
-    }
-    return { state: { seed, questions, i: 0, answers: [], askedAt: now, startedAt: now, endedAt: null }, contentKey: questions[0].text.en };
+    // Pas deux fois la même question dans une partie, ni une question déjà posée récemment au joueur
+    // (elle revient seulement si la réserve est épuisée)
+    for (const fresh of [true, false])
+      for (let k = 0; questions.length < QCM_QUESTIONS && k < 200; k++) {
+        const q = make(seed, k);
+        if (!questions.some((x) => x.text.fr === q.text.fr) && (!fresh || !seen.has(q.text.en))) questions.push(q);
+      }
+    return { state: { seed, questions, i: 0, answers: [], askedAt: now, startedAt: now, endedAt: null }, contentKey: questions.map((q) => q.text.en) };
   },
   publicState(s, now) {
     const q = s.questions[s.i];

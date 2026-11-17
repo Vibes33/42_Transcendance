@@ -9,11 +9,12 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@loltr/shared": "workspace:*",
     "@loltr/content": "workspace:*",
+    "@loltr/shared": "workspace:*",
     "drizzle-orm": "0.45.4",
     "elysia": "1.4.30",
-    "ioredis": "5.11.1"
+    "ioredis": "5.11.1",
+    "sharp": "0.34.3"
   },
   "devDependencies": {
     "drizzle-kit": "0.31.11"

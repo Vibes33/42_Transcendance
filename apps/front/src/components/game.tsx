@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { LITE_CHAMPIONS, squareImg } from "@loltr/content/lite";
-import { suggest, type GameKey, type LiveMember } from "@loltr/shared";
+import { normalize, suggest, type GameKey, type LiveMember } from "@loltr/shared";
 import { useT } from "../i18n";
 import { avatarOf } from "../lib/chibi";
 import { GAME_TITLE } from "../lib/games";
@@ -118,6 +118,16 @@ export function AnswerInput({
   }, [disabled]);
   const sugg = useMemo(() => suggest(q, exclude ? options.filter((o) => !exclude.has(o.id)) : options, 6), [q, options, exclude]);
   const submit = (id?: string) => {
+    // Nom tapé en entier d'un champion déjà proposé (« Vi ») : on ne prend pas la première
+    // suggestion (« Viego »), le serveur répond « Déjà proposé » sans compter d'essai
+    const typed = normalize(q);
+    const again = !id && typed && exclude ? options.find((o) => exclude.has(o.id) && o.names.some((n) => normalize(n) === typed)) : undefined;
+    if (again) {
+      onAnswer({ champion: again.id });
+      setQ("");
+      setSel(0);
+      return;
+    }
     const pick = id ?? sugg[sel]?.id ?? sugg[0]?.id;
     if (pick) onAnswer({ champion: pick });
     else if (q.trim()) onAnswer({ text: q.trim() });

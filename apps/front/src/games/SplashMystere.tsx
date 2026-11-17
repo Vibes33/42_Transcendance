@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LITE_BY_ID } from "@loltr/content/lite";
 import { SPLASH_CHAMPION_POINTS, SPLASH_SKIN_POINTS } from "@loltr/shared";
 import { AnswerInput, EndDialog, GameBar, modeSub, pointsLabel, pointsText, useChampionOptions } from "../components/game";
@@ -31,11 +31,38 @@ export function SplashMystere({ round, act, finish, flow, groupSize, namesLang }
   const exclude = new Set(pub.misses);
   const reveal = round.reveal as { champion: string; skinNum: number; skin: { fr: string; en: string } | null } | null;
   const champ = LITE_BY_ID[pub.champion ?? reveal?.champion ?? ""];
-  const img = pub.demoImage ?? `/api/jeux/rounds/${round.id}/image/0`;
+  // Le serveur ne sert que la zone zoomée (une image par cran) ; l'image entière à la fin
+  const img = pub.demoImage ?? `/api/jeux/rounds/${round.id}/image/0?cran=${round.over ? "fin" : pub.step}`;
   const tries = pub.misses.length + (pub.found ? 1 : 0);
   const bonus = pub.found && pub.skinPick === null && !round.over;
   const playing = !pub.found && !round.over;
   const scale = round.over ? 1 : pub.scale;
+  // Image affichée : la nouvelle zone part du cadrage du cran précédent, puis s'élargit (dézoom animé)
+  const [shown, setShown] = useState<{ src: string; scale: number; from: number } | null>(null);
+  const [settled, setSettled] = useState(true);
+  useEffect(() => {
+    if (pub.demoImage) return;
+    let alive = true;
+    const im = new Image();
+    im.onload = () => {
+      if (!alive) return;
+      setShown((prev) => ({ src: img, scale, from: prev ? prev.scale : scale }));
+      setSettled(false);
+    };
+    im.src = img;
+    return () => {
+      alive = false;
+    };
+  }, [img]);
+  useEffect(() => {
+    if (settled) return;
+    let id = requestAnimationFrame(() => (id = requestAnimationFrame(() => setSettled(true))));
+    return () => cancelAnimationFrame(id);
+  }, [settled]);
+  // Démo du tutoriel : image publique, zoom fait par l'interface
+  const view = pub.demoImage
+    ? { src: img, transform: `scale(${scale})`, transition: "transform .7s ease" }
+    : { src: shown?.src, transform: settled || !shown ? "scale(1)" : `scale(${shown.from / shown.scale})`, transition: settled ? "transform .7s ease" : "none" };
 
   const guess = async (a: { champion?: string; text?: string }) => {
     const res = await act({ type: "guess", ...a }).catch(() => null);
@@ -56,14 +83,16 @@ export function SplashMystere({ round, act, finish, flow, groupSize, namesLang }
         <section aria-label={t("Partie")} className="flex flex-col items-center gap-3.5 max-w-full" style={{ width: 880 }}>
           <div data-tuto="splash-image" className="relative w-full p-[2px] box-border cut-lg" style={{ background: pub.found ? "var(--ok)" : "var(--acc)", filter: "drop-shadow(0 20px 44px color-mix(in srgb, var(--acc) 18%, transparent))" }}>
             <div className="relative w-full overflow-hidden bg-surf2 cut-lg" style={{ aspectRatio: "1215 / 717" }}>
-              <img
-                src={img}
-                alt={t("Splash art à deviner")}
-                draggable={false}
-                onContextMenu={(e) => e.preventDefault()}
-                className="block w-full h-full object-cover select-none"
-                style={{ transform: `scale(${scale})`, transformOrigin: pub.origin, transition: "transform .7s ease" }}
-              />
+              {view.src && (
+                <img
+                  src={view.src}
+                  alt={t("Splash art à deviner")}
+                  draggable={false}
+                  onContextMenu={(e) => e.preventDefault()}
+                  className="block w-full h-full object-cover select-none"
+                  style={{ transform: view.transform, transformOrigin: pub.origin, transition: view.transition }}
+                />
+              )}
               <span className="absolute left-[22px] top-[18px] flex items-center gap-2 h-[34px] px-3.5 cut-sm font-d font-bold text-[15px]" style={{ background: "color-mix(in srgb, var(--bg) 72%, transparent)" }}>
                 <Zoom className="text-acc" />
                 {t("Zoom")} ×{scale.toFixed(1)}

@@ -20,7 +20,13 @@ import { StreamCard } from "./Stream";
 
 type Ctx = "defi" | "classique" | "streamer";
 
+/** Une autre partie (nouvelle session de groupe, autre jeu) repart d'une page neuve, sans état de la précédente. */
 export function Partie() {
+  const [sp] = useSearchParams();
+  return <PartiePage key={`${sp.get("ctx") ?? ""}:${sp.get("session") ?? ""}:${sp.get("game") ?? ""}`} />;
+}
+
+function PartiePage() {
   const t = useT();
   const nav = useNavigate();
   const [sp] = useSearchParams();
@@ -112,11 +118,12 @@ export function Partie() {
     return () => setPresence("online");
   }, [game]);
 
-  // En groupe : tout le monde a fini → récapitulatif ; jeu suivant lancé → nouvelle manche
+  // En groupe : tout le monde a fini → récapitulatif ; jeu suivant lancé → nouvelle manche. Un
+  // tutoriel en cours n'est pas interrompu : le récap s'affiche quand il se termine.
   useEffect(() => {
-    if (!session || session.kind !== "group") return;
+    if (!session || session.kind !== "group" || tutorial) return;
     if (session.phase === "recap" || session.phase === "done") nav(`/recap?session=${session.id}`);
-  }, [session?.phase, session?.index]);
+  }, [session?.phase, session?.index, tutorial]);
 
   const act = useCallback(
     async (action: Record<string, unknown>) => {
@@ -264,7 +271,7 @@ export function Partie() {
 }
 
 /** Un coéquipier s'est déconnecté : on peut l'attendre, ou continuer sans lui. */
-function DisconnectBanner({ session, meId }: { session: LiveSession | null; meId?: string }) {
+export function DisconnectBanner({ session, meId }: { session: LiveSession | null; meId?: string }) {
   const t = useT();
   if (!session || session.kind !== "group") return null;
   const gone = session.members.filter((m) => m.status === "disconnected" && m.userId !== meId);

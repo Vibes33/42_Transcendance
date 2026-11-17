@@ -333,7 +333,8 @@ export const MAYHEM_ENTRANTS = 16;
 export const MAYHEM_GROUP_DAYS = 3;
 
 /** Victoires d'un participant sur tout le tournoi (poules comprises, 0 à 6). */
-export const mayhemWins = (tour: MayhemTournament, idx: number) => [...tour.groups.flatMap((g) => g.matches), ...tour.rounds.flat()].filter((m) => m.winner === idx).length;
+// Les tournois d'avant la phase de poules n'ont pas de `groups`
+export const mayhemWins = (tour: MayhemTournament, idx: number) => [...(tour.groups ?? []).flatMap((g) => g.matches), ...tour.rounds.flat()].filter((m) => m.winner === idx).length;
 
 /** Bilan d'un participant dans sa poule, jusqu'à la journée `days` incluse. */
 export function groupRecord(g: MayhemGroup, idx: number, days = MAYHEM_GROUP_DAYS) {

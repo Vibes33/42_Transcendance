@@ -26,6 +26,11 @@ http:
         period: 1s
     compress:
       compress: {}
+    to-https:
+      redirectScheme:
+        scheme: https
+        port: '{{ env "HTTPS_PORT" | default "443" }}'
+        permanent: true
     security-headers:
       headers:
         stsSeconds: 31536000

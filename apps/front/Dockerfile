@@ -20,6 +20,8 @@ COPY apps/front ./apps/front
 RUN rm -rf apps/front/public/models && cd apps/front && bun run build
 
 FROM oven/bun:1.4.3
+# Mode production : pas de trace d'erreur avec le code source
+ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /app/apps/front/dist ./dist
 COPY apps/front/public/models ./dist/models

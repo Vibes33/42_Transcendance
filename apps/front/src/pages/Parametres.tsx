@@ -46,9 +46,16 @@ export function Parametres() {
     nav("/connexion");
   };
   const remove = async () => {
-    await del("/api/auth/me").catch(() => {});
+    try {
+      await del("/api/auth/me");
+    } catch (e) {
+      // Échec : le compte existe toujours, on reste connecté sur la page
+      useUi.getState().toast((e as Error).message, "danger");
+      return;
+    }
     disconnectLive();
     queryClient.clear();
+    await refreshMe();
     nav("/connexion");
   };
 

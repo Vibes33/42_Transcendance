@@ -8,6 +8,8 @@ import { configuredProviders, finishAuth, startAuth } from "./providers";
 
 const SESSION_COOKIE = "loltr_session";
 const DEVICE_COOKIE = "loltr_device";
+/** `state` OAuth lié au navigateur qui a lancé la connexion (sinon un lien de retour volé connecte la victime au compte de l'attaquant). */
+const OAUTH_COOKIE = "loltr_oauth";
 const SESSION_DAYS = 30;
 
 export interface AuthDeps {
@@ -109,12 +111,13 @@ export function createAuthApp(deps: AuthDeps) {
       await deps.publish("user.created", { userId: id, kind: "guest" });
       return { userId: id, kind: "guest" };
     })
-    .get("/login/:provider", ({ params, redirect: go }) => {
+    .get("/login/:provider", ({ params, cookie, redirect: go }) => {
       const p = params.provider as Provider;
       if (!configuredProviders().includes(p)) fail(404, "provider_disabled", "Ce mode de connexion n’est pas configuré.");
       const s = startAuth(p);
       db.delete(oauthStates).where(lt(oauthStates.createdAt, now() - 600_000)).run();
       db.insert(oauthStates).values({ state: s.state, provider: p, codeVerifier: s.codeVerifier, createdAt: now() }).run();
+      cookie[OAUTH_COOKIE].set({ value: s.state, ...cookieOpts, maxAge: 600 });
       return go(s.url.toString(), 302);
     })
     .get(
@@ -122,7 +125,9 @@ export function createAuthApp(deps: AuthDeps) {
       async ({ params, query, headers, cookie, redirect: go }) => {
         const p = params.provider as Provider;
         const st = db.select().from(oauthStates).where(eq(oauthStates.state, query.state ?? "")).get();
-        if (!st || st.provider !== p || st.createdAt < now() - 600_000 || !query.code) return go("/connexion?erreur=oauth", 302);
+        const mine = readCookie(headers.cookie, OAUTH_COOKIE) === query.state;
+        cookie[OAUTH_COOKIE].set({ value: "", ...cookieOpts, maxAge: 0 });
+        if (!st || !mine || st.provider !== p || st.createdAt < now() - 600_000 || !query.code) return go("/connexion?erreur=oauth", 302);
         db.delete(oauthStates).where(eq(oauthStates.state, st.state)).run();
         let subject: string;
         try {
@@ -158,8 +163,10 @@ export function createAuthApp(deps: AuthDeps) {
     .delete("/me", async ({ headers, cookie }) => {
       const s = sessionOf(readCookie(headers.cookie, SESSION_COOKIE));
       if (!s) fail(401, "unauthenticated");
+      db.delete(sessions).where(eq(sessions.userId, s!.userId)).run();
       db.delete(users).where(eq(users.id, s!.userId)).run();
       cookie[SESSION_COOKIE].set({ value: "", ...cookieOpts, maxAge: 0 });
+      await deps.publish("user.deleted", { userId: s!.userId });
       return { ok: true };
     });
 }

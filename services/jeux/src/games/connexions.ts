@@ -63,10 +63,13 @@ export function buildBoard(seed: string): Group[] {
 
 export const connexions: GameEngine<S> = {
   key: "connexions",
-  create({ seed, now }) {
-    const groups = buildBoard(seed);
+  create({ seed, now, seen }) {
+    // Une grille déjà jouée (mêmes 4 liens) est retirée, dans la limite de quelques essais
+    const keyOf = (g: Group[]) => g.map((x) => x.label.en).sort().join("|");
+    let groups = buildBoard(seed);
+    for (let k = 1; k < 20 && seen.has(keyOf(groups)); k++) groups = buildBoard(seed + ":" + k);
     const order = shuffle(groups.flatMap((g) => g.champs), rng(seed + ":order"));
-    return { state: { seed, groups, order, found: [], errors: 0, tried: [], startedAt: now, endedAt: null }, contentKey: groups.map((g) => g.label.en).sort().join("|") };
+    return { state: { seed, groups, order, found: [], errors: 0, tried: [], startedAt: now, endedAt: null }, contentKey: keyOf(groups) };
   },
   publicState(s, now) {
     const over = this.isOver(s, now);

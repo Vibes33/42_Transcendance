@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { pseudoSuggestions, randomPseudo, tagOf, validatePseudo, type Profile, type PublicPlayer } from "@loltr/shared";
 import { callerPlugin, fail, health, internalGuard, requireAccount, requireSession, type EventMap, type EventType } from "@loltr/shared/server";
 import { ACCENTS, CHIBI_BY_KEY, SKIN_BY_ID, STARTERS } from "@loltr/content";
@@ -44,14 +44,19 @@ export function createProfilApp(deps: ProfilDeps) {
   const now = deps.now ?? Date.now;
 
   /** Profil de l'appelant, créé à la première visite. Un invité reçoit un pseudo et un chibi au hasard. */
-  function ensure(userId: string, kind: "user" | "guest"): Row {
+  function ensure(userId: string, kind: "user" | "guest", init: { lang?: "fr" | "en"; mode?: "sombre" | "clair" } = {}): Row {
     const found = db.select().from(profiles).where(eq(profiles.userId, userId)).get();
     if (found) return found;
     const guest = kind === "guest";
     let pseudo: string | null = null;
     if (guest) {
-      do pseudo = randomPseudo();
-      while (db.select({ id: profiles.userId }).from(profiles).where(eq(profiles.pseudoLower, pseudo.toLowerCase())).get());
+      // Quelques essais au hasard, puis un suffixe unique : jamais de boucle sans fin
+      const free = (p: string) => !db.select({ id: profiles.userId }).from(profiles).where(eq(profiles.pseudoLower, p.toLowerCase())).get();
+      for (let i = 0; i < 20 && !pseudo; i++) {
+        const p = randomPseudo();
+        if (free(p)) pseudo = p;
+      }
+      pseudo ??= "Poro" + crypto.randomUUID().replace(/-/g, "").slice(0, 10);
     }
     const row: Row = {
       userId,
@@ -60,10 +65,11 @@ export function createProfilApp(deps: ProfilDeps) {
       pseudoLower: pseudo?.toLowerCase() ?? null,
       tag: pseudo ? tagOf(pseudo) : null,
       role: null,
-      namesLang: "fr",
-      siteLang: "fr",
+      // Langue et thème choisis sur l'appareil avant l'inscription
+      namesLang: init.lang ?? "fr",
+      siteLang: init.lang ?? "fr",
       reminder: true,
-      mode: "sombre",
+      mode: init.mode ?? "sombre",
       chibi: guest ? THEMED[Math.floor(Math.random() * THEMED.length)] : "random",
       skin: null,
       starter: null,
@@ -87,10 +93,14 @@ export function createProfilApp(deps: ProfilDeps) {
   return new Elysia({ prefix: "/api/profil" })
     .use(callerPlugin)
     .use(health)
-    .get("/me", ({ caller }) => {
-      const id = requireSession(caller);
-      return toProfile(ensure(id, caller.kind === "guest" ? "guest" : "user"));
-    })
+    .get(
+      "/me",
+      ({ caller, query }) => {
+        const id = requireSession(caller);
+        return toProfile(ensure(id, caller.kind === "guest" ? "guest" : "user", query));
+      },
+      { query: t.Object({ lang: t.Optional(t.Union([t.Literal("fr"), t.Literal("en")])), mode: t.Optional(t.Union([t.Literal("sombre"), t.Literal("clair")])) }) }
+    )
     .get(
       "/pseudo/check",
       ({ caller, query }) => {
@@ -133,8 +143,16 @@ export function createProfilApp(deps: ProfilDeps) {
         if (!row.pseudo) fail(409, "pseudo_required", "Choisis d’abord un pseudo.");
         if (row.starter) fail(409, "starter_done", "Le premier chibi est déjà choisi.");
         if (!(STARTERS as readonly string[]).includes(body.chibi)) fail(400, "starter_invalid");
-        await deps.grant(id, "chibi:" + body.chibi, "starter");
-        db.update(profiles).set({ starter: body.chibi, chibi: body.chibi, skin: null, onboarded: true, updatedAt: now() }).where(eq(profiles.userId, id)).run();
+        // Réservé avant l'appel au classement : deux requêtes simultanées n'offrent pas deux chibis
+        const claim = db.update(profiles).set({ starter: body.chibi }).where(and(eq(profiles.userId, id), isNull(profiles.starter))).run() as unknown as { changes: number };
+        if (claim.changes === 0) fail(409, "starter_done", "Le premier chibi est déjà choisi.");
+        try {
+          await deps.grant(id, "chibi:" + body.chibi, "starter");
+        } catch (e) {
+          db.update(profiles).set({ starter: null }).where(eq(profiles.userId, id)).run();
+          throw e;
+        }
+        db.update(profiles).set({ chibi: body.chibi, skin: null, onboarded: true, updatedAt: now() }).where(eq(profiles.userId, id)).run();
         const next = ensure(id, "user");
         await announce(next);
         return toProfile(next);
@@ -209,14 +227,15 @@ export function createProfilApp(deps: ProfilDeps) {
     .group("/internal", (g) =>
       g
         .use(internalGuard)
-        .get(
+        // POST : la liste peut compter des milliers d'identifiants (trop long pour une URL)
+        .post(
           "/players",
-          ({ query }) => {
-            const ids = query.ids.split(",").filter(Boolean);
-            if (!ids.length) return [];
-            return db.select().from(profiles).where(inArray(profiles.userId, ids)).all().map(toPublic);
+          ({ body }) => {
+            const out: PublicPlayer[] = [];
+            for (let i = 0; i < body.ids.length; i += 500) out.push(...db.select().from(profiles).where(inArray(profiles.userId, body.ids.slice(i, i + 500))).all().map(toPublic));
+            return out;
           },
-          { query: t.Object({ ids: t.String() }) }
+          { body: t.Object({ ids: t.Array(t.String()) }) }
         )
         // Retrouve un joueur par « pseudo » ou « pseudo#tag » (ajout d'ami).
         .get(

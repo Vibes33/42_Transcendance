@@ -3,6 +3,7 @@ import {
   basePoints,
   compareResults,
   dayKey,
+  forceCloseAt,
   randomSeed,
   rotationFor,
   type GameContext,
@@ -55,6 +56,8 @@ interface Internal extends LiveSession {
 }
 
 const SESSION_TTL = 2 * 86_400;
+/** Appartenance d'un joueur : une partie de groupe et une session de stream ne s'écrasent pas. */
+const memberKey = (kind: "group" | "stream", userId: string) => (kind === "stream" ? "rt:viewer:" : "rt:member:") + userId;
 const STREAM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 export interface Socket {
@@ -118,6 +121,14 @@ export class Hub {
     this.offlineTimers.set(userId, timer);
   }
 
+  /** Socket fermée (OBS ou viewer non inscrit) : elle ne reçoit plus rien. */
+  unwatch(socket: Socket) {
+    for (const [code, w] of this.watchers) {
+      w.delete(socket);
+      if (!w.size) this.watchers.delete(code);
+    }
+  }
+
   watch(code: string, socket: Socket) {
     let set = this.watchers.get(code.toUpperCase());
     if (!set) this.watchers.set(code.toUpperCase(), (set = new Set()));
@@ -171,14 +182,22 @@ export class Hub {
     return s;
   }
 
-  /** Session en cours d'un joueur (la plus récente non terminée). */
+  /** Session en cours d'un joueur : sa partie de groupe, sinon le stream qu'il suit. */
   async sessionOf(userId: string): Promise<Internal | null> {
-    const id = await this.deps.store.get("rt:member:" + userId);
-    if (!id) return null;
-    const s = await this.get(id);
-    if (!s || s.phase === "done") return null;
-    const m = s.members.find((x) => x.userId === userId);
-    return m && m.status !== "left" ? s : null;
+    for (const kind of ["group", "stream"] as const) {
+      const id = await this.deps.store.get(memberKey(kind, userId));
+      const s = id ? await this.get(id) : null;
+      if (!s || s.phase === "done") continue;
+      const m = s.members.find((x) => x.userId === userId);
+      if (m && m.status !== "left") return s;
+    }
+    return null;
+  }
+
+  /** Efface l'appartenance du joueur à cette session seulement (pas à une session plus récente). */
+  private async release(s: Internal, userId: string) {
+    const key = memberKey(s.kind, userId);
+    if ((await this.deps.store.get(key)) === s.id) await this.deps.store.del(key);
   }
 
   private async streamByCode(code: string): Promise<Internal | null> {
@@ -209,9 +228,13 @@ export class Hub {
     const prev = await this.deps.store.get("rt:group:" + g!.id);
     const running = prev ? await this.get(prev) : null;
     if (running && running.phase !== "done") {
-      // Le défi du jour en cours se reprend (qui l'a quitté pour le finir en solo n'y revient pas)
-      const liveDefi = running.context === "defi" && running.day === day;
-      if (liveDefi && context === "defi") return this.view(running);
+      // Le défi en cours se reprend, celui de la veille aussi jusqu'à 3 h 30 ; qui l'a quitté pour le
+      // finir en solo n'y revient pas
+      const liveDefi = running.context === "defi" && this.now() < forceCloseAt(running.day);
+      if (liveDefi && context === "defi") {
+        if (running.members.find((m) => m.userId === leader)?.status === "left") fail(409, "defi_left", "Tu as quitté le défi de ton groupe : termine-le en solo.");
+        return this.view(running);
+      }
       if (liveDefi) fail(409, "defi_running", "Le groupe joue le défi du jour : finissez-le avant de lancer une autre partie.");
       // Partie classique (ou défi d'un autre jour) : la nouvelle partie la remplace
       await this.close(running);
@@ -219,7 +242,11 @@ export class Hub {
     let games: GameKey[];
     if (context === "defi") games = rotationFor(day);
     else {
-      if (!game || !GAMES[game]?.classicPlayable) fail(400, "not_classic");
+      const m = game ? GAMES[game] : undefined;
+      if (!m?.classicPlayable) fail(400, "not_classic");
+      if (!m!.modes.includes("groupe")) fail(409, "solo_only", "Ce jeu se joue seul.");
+      if (g!.members.length < m!.minPlayers) fail(409, "not_enough_players", `Il faut au moins ${m!.minPlayers} joueurs pour ce jeu.`);
+      if (g!.members.length > m!.maxPlayers) fail(409, "too_many_players", `Ce jeu se joue à ${m!.maxPlayers} au plus.`);
       games = [game!];
     }
     const s: Internal = {
@@ -241,7 +268,7 @@ export class Hub {
     };
     await this.save(s);
     await this.deps.store.set("rt:group:" + g!.id, s.id, SESSION_TTL);
-    for (const m of s.members) await this.deps.store.set("rt:member:" + m.userId, s.id, SESSION_TTL);
+    for (const m of s.members) await this.deps.store.set(memberKey("group", m.userId), s.id, SESSION_TTL);
     this.broadcast(s);
     return this.view(s);
   }
@@ -250,7 +277,7 @@ export class Hub {
   private async close(s: Internal) {
     s.phase = "done";
     await this.save(s);
-    for (const m of s.members) if ((await this.deps.store.get("rt:member:" + m.userId)) === s.id) await this.deps.store.del("rt:member:" + m.userId);
+    for (const m of s.members) await this.release(s, m.userId);
     this.broadcast(s);
   }
 
@@ -263,6 +290,7 @@ export class Hub {
     }
     const day = dayKey(this.now());
     if (context === "classique" && (!game || !GAMES[game]?.classicPlayable)) fail(400, "not_classic");
+    if (context === "classique" && !GAMES[game!].modes.includes("streamer")) fail(409, "not_streamable", "Ce jeu ne se joue pas en stream.");
     const s: Internal = {
       id: crypto.randomUUID(),
       kind: "stream",
@@ -282,7 +310,7 @@ export class Hub {
     };
     await this.save(s);
     await this.deps.store.set("rt:code:" + code, s.id, SESSION_TTL);
-    await this.deps.store.set("rt:member:" + streamerId, s.id, SESSION_TTL);
+    await this.deps.store.set(memberKey("stream", streamerId), s.id, SESSION_TTL);
     this.broadcast(s);
     return this.view(s);
   }
@@ -298,14 +326,15 @@ export class Hub {
     }
     m.status = "active";
     await this.save(s!);
-    await this.deps.store.set("rt:member:" + userId, s!.id, SESSION_TTL);
+    await this.deps.store.set(memberKey("stream", userId), s!.id, SESSION_TTL);
     this.broadcast(s!);
     return this.view(s!);
   }
 
-  private member(s: Internal, userId: string) {
+  /** Membre de la session ; `present` refuse aussi ceux qui l'ont quittée ou en ont été exclus. */
+  private member(s: Internal, userId: string, present = false) {
     const m = s.members.find((x) => x.userId === userId);
-    if (!m) fail(403, "not_in_session");
+    if (!m || (present && m.status === "left")) fail(403, "not_in_session");
     return m!;
   }
 
@@ -314,14 +343,19 @@ export class Hub {
   }
 
   /** Résultat d'une manche reçu du service jeux. */
-  async onRoundFinished(ev: { sessionId: string | null; userId: string; game: GameKey; context: GameContext; result: RoundResult; basePoints: number }) {
+  async onRoundFinished(ev: { sessionId: string | null; userId: string; game: GameKey; context: GameContext; result: RoundResult; basePoints: number; seed?: string | null }) {
     if (!ev.sessionId) return;
     const s = await this.get(ev.sessionId);
     if (!s || s.phase === "done") return;
     const m = s.members.find((x) => x.userId === ev.userId);
     if (!m) return;
-    const index = s.context === "defi" ? s.games.indexOf(ev.game) : s.index;
+    // Stream : la manche se lit dans la graine (« graine:manche:jeu »), pas dans la manche affichée,
+    // qui a pu avancer pendant que le viewer finissait
+    const fromSeed = s.kind === "stream" && ev.seed?.startsWith(s.seed + ":") ? Number(ev.seed.slice(s.seed.length + 1).split(":")[0]) : NaN;
+    const index = s.context === "defi" ? s.games.indexOf(ev.game) : Number.isInteger(fromSeed) ? fromSeed : s.index;
     if (index < 0) return;
+    // Une manche de stream rejouée (page rechargée) ne remplace pas le premier résultat
+    if (s.kind === "stream" && m.results[index]?.done) return;
     const points = s.context === "classique" ? 0 : ev.context === "streamer" ? basePoints(ev.result) : ev.basePoints;
     m.results[index] = { game: ev.game, done: true, basePoints: points, projected: points, summary: summarize(ev.result) };
     m.progress = null;
@@ -362,7 +396,15 @@ export class Hub {
   async ready(id: string, userId: string, tutorial = false): Promise<LiveSession> {
     const s = await this.get(id);
     if (!s) fail(404, "session_not_found");
-    const m = this.member(s!, userId);
+    const m = this.member(s!, userId, true);
+    // Tutoriel demandé depuis le menu de fin de jeu, avant le récap : le joueur sera compté prêt
+    // au récap (il suit son tutoriel pendant que le groupe enchaîne)
+    if (s!.phase === "playing" && tutorial && m.results[s!.index]?.done) {
+      m.tutorial = true;
+      await this.save(s!);
+      this.broadcast(s!);
+      return this.view(s!);
+    }
     if (s!.phase !== "recap") fail(409, "not_in_recap");
     m.ready = true;
     m.tutorial = tutorial;
@@ -373,7 +415,8 @@ export class Hub {
   }
 
   private advance(s: Internal) {
-    if (s.context === "classique") s.games.push(s.games[s.index]);
+    // Jeu classique (groupe, ou stream à jeu unique) : une nouvelle manche du même jeu
+    if (s.context === "classique" || (s.kind === "stream" && new Set(s.games).size === 1)) s.games.push(s.games[s.index]);
     s.index++;
     for (const m of s.members) {
       m.ready = false;
@@ -387,7 +430,7 @@ export class Hub {
   async continueWithout(id: string, userId: string): Promise<LiveSession> {
     const s = await this.get(id);
     if (!s) fail(404, "session_not_found");
-    this.member(s!, userId);
+    this.member(s!, userId, true);
     for (const m of s!.members) if (m.status === "disconnected") m.status = "away";
     if (s!.phase === "playing" && this.active(s!).every((x) => x.results[s!.index]?.done)) await this.toRecap(s!);
     else if (s!.phase === "recap" && this.active(s!).every((x) => x.ready)) this.advance(s!);
@@ -404,13 +447,17 @@ export class Hub {
     const s = await this.get(id);
     if (!s) fail(404, "session_not_found");
     const m = this.member(s!, userId);
+    // Seul un joueur laissé par le groupe (absent ou déconnecté) peut revenir : pas un joueur exclu
+    if (m.status !== "away" && m.status !== "disconnected") fail(409, "cannot_rejoin", "Tu ne fais plus partie de cette partie.");
     if (choice === "solo") {
       m.status = "left";
-      await this.deps.store.del("rt:member:" + userId);
+      await this.release(s!, userId);
     } else {
       if (s!.context === "defi" && s!.phase !== "done") {
-        await this.deps.forfeit(userId, s!.day, s!.games[s!.index]);
-        for (let i = 0; i < s!.index; i++) m.results[i] ??= { game: s!.games[i], done: true, basePoints: 0, projected: 0, summary: null };
+        // Pendant le récap, le jeu en cours est fini pour le groupe : il est perdu aussi
+        const upTo = s!.phase === "recap" ? s!.index + 1 : s!.index;
+        await this.deps.forfeit(userId, s!.day, s!.games[upTo] ?? "");
+        for (let i = 0; i < upTo; i++) m.results[i] ??= { game: s!.games[i], done: true, basePoints: 0, projected: 0, summary: null };
       }
       m.status = "active";
       m.ready = false;
@@ -426,7 +473,7 @@ export class Hub {
     const m = s.members.find((x) => x.userId === userId);
     if (!m) return;
     m.status = "left";
-    await this.deps.store.del("rt:member:" + userId);
+    await this.release(s, userId);
     const rest = s.members.filter((x) => x.status !== "left");
     if (s.kind === "stream" && userId === s.streamerId) s.phase = "done";
     else if (!rest.length) s.phase = "done";
@@ -445,6 +492,7 @@ export class Hub {
     const s = await this.get(id);
     if (!s || s.kind !== "stream") fail(404, "session_not_found");
     if (s!.streamerId !== userId) fail(403, "not_streamer");
+    if (s!.phase === "done") fail(409, "session_over", "La session est terminée.");
     this.advance(s!);
     await this.save(s!);
     this.broadcast(s!);
@@ -492,7 +540,10 @@ export class Hub {
       kind: s.kind,
       seed: s.kind === "stream" ? `${s.seed}:${s.index}` : s.seed,
       members: s.members.filter((m) => m.status !== "left").map((m) => m.userId),
+      /** Membres que le groupe a laissés (« continuer sans lui ») : ils ne bloquent plus rien. */
+      away: s.members.filter((m) => m.status === "away").map((m) => m.userId),
       streamerId: s.streamerId,
+      index: s.index,
       game: s.games[s.index] ?? null
     };
   }

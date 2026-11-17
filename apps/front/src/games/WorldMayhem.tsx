@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { MAYHEM_GROUP_DAYS, MAYHEM_TEAMS, groupRecord, mayhemWins, type MayhemMatch, type MayhemTournament } from "@loltr/content/lite";
-import { get } from "../api/client";
+import { get, post } from "../api/client";
 import { EndDialog, GameBar, modeSub } from "../components/game";
 import { useT } from "../i18n";
 import { useMe } from "../state/app";
@@ -40,9 +40,13 @@ export function WorldMayhem({ round, act, flow, groupSize }: GameProps<MayhemPub
   const [tab, setTab] = useState<"groups" | "bracket" | null>(null);
   // Mon parcours fini, je peux dévoiler le tournoi complet (et alors regarder n'importe quel match)
   const [spec, setSpec] = useState<{ key: string; match: MayhemMatch; game: number; label: string } | null>(null);
+  // Enregistré sans recharger la manche : la réponse ne renvoie pas le tournoi entier (plus de 200 Ko)
+  const savedStep = useRef(pub.watched ?? 0);
   useEffect(() => {
-    if (view.step > (pub.watched ?? 0) && !round.over) act({ type: "watched", step: view.step }).catch(() => {});
-  }, [view.step, pub.watched, round.over, act]);
+    if (view.step <= savedStep.current || round.over || flow.demo) return;
+    savedStep.current = view.step;
+    post(`/api/jeux/rounds/${round.id}/act`, { type: "watched", step: view.step }).catch(() => {});
+  }, [view.step, round.over, round.id]);
   const rollTimer = useRef<ReturnType<typeof setInterval>>(undefined);
   useEffect(() => () => clearInterval(rollTimer.current), []);
 
@@ -332,8 +336,8 @@ export function WorldMayhem({ round, act, flow, groupSize }: GameProps<MayhemPub
           }
           stats={[
             { v: pub.rating.rating, l: t("Note d’équipe"), acc: true },
-            { v: wins, l: t("Victoires") },
-            { v: pub.rating.rating + 2 * wins, l: t("Score du jour") }
+            // L'équipe du jour se classe à la note d'équipe (les victoires ne départagent que les ex aequo)
+            { v: wins, l: t("Victoires") }
           ]}
         />
       )}

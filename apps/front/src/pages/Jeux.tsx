@@ -8,7 +8,7 @@ import { Shard, TriLeft, TriRight } from "../components/icons";
 import { fmt, useT } from "../i18n";
 import { GameInfo } from "../components/GameInfo";
 import { GAME_CARDS, lastGameIndex, rememberGame, type GameCard } from "../lib/games";
-import { partieUrl, startGroup } from "../lib/play";
+import { groupBlock, partieUrl, startGroup } from "../lib/play";
 import { useMe } from "../state/app";
 import { useUi } from "../state/ui";
 
@@ -60,7 +60,10 @@ export function Jeux() {
     if (!me.isUser) return ui.askLogin("compte");
     nav(partieUrl("classique", gc.key as GameKey));
   };
-  const group = () => startGroup(nav, { isUser: me.isUser, inGroup: me.inGroup, mates: me.mates.length, context: "classique", game: gc.key as GameKey });
+  const mates = me.mates.filter((m) => m.status === "member").length;
+  const group = () => startGroup(nav, { isUser: me.isUser, inGroup: me.inGroup, mates, context: "classique", game: gc.key as GameKey });
+  // Groupe trop petit ou trop grand pour ce jeu : bouton désactivé, la raison s'affiche au survol
+  const groupWhy = me.inGroup && gc.key ? groupBlock(gc.key as GameKey, mates + 1) : null;
 
 
   return (
@@ -138,10 +141,24 @@ export function Jeux() {
                 )}
                 {/* Jeux seulement solo (Champion parfait, Sudoku) : pas de partie entre amis */}
                 {gc.multi && (
-                  <button type="button" onClick={group} className="relative h-[clamp(48px,6vh,60px)] px-12 border-0 bg-ink text-ink para cursor-pointer font-d font-bold text-lg tracking-[0.06em] uppercase">
-                    <span aria-hidden="true" className="absolute inset-[2px] para" style={{ background: me.inGroup ? "color-mix(in srgb, var(--acc) 18%, var(--surf))" : "var(--surf)" }} />
-                    <span className="relative">{t("Jouer avec des amis")}</span>
-                  </button>
+                  <span className="tipw">
+                    <button
+                      type="button"
+                      onClick={group}
+                      aria-disabled={!!groupWhy}
+                      aria-describedby={groupWhy ? "tip-groupe-jeux" : undefined}
+                      className="relative h-[clamp(48px,6vh,60px)] px-12 border-0 bg-ink text-ink para font-d font-bold text-lg tracking-[0.06em] uppercase"
+                      style={{ cursor: groupWhy ? "not-allowed" : "pointer", opacity: groupWhy ? 0.55 : 1 }}
+                    >
+                      <span aria-hidden="true" className="absolute inset-[2px] para" style={{ background: me.inGroup ? "color-mix(in srgb, var(--acc) 18%, var(--surf))" : "var(--surf)" }} />
+                      <span className="relative">{t("Jouer avec des amis")}</span>
+                    </button>
+                    {groupWhy && (
+                      <span role="tooltip" id="tip-groupe-jeux" className="tip">
+                        {groupWhy}
+                      </span>
+                    )}
+                  </span>
                 )}
               </>
             )}
