@@ -253,3 +253,22 @@ describe("Splash mystère : image", () => {
     expect([end.width, end.height]).toEqual([W, H]);
   });
 });
+
+describe("groupe", () => {
+  test("classique : une page rechargée reprend la manche en cours", async () => {
+    const { post } = setup({ owned: { u1: ["game:se"] } });
+    const r1 = (await post("/rounds", "u1", { game: "se", context: "classique", sessionId: "g1" })).body;
+    const again = (await post("/rounds", "u1", { game: "se", context: "classique", sessionId: "g1" })).body;
+    expect(again.id).toBe(r1.id);
+    await post(`/rounds/${r1.id}/finish`, "u1", { quit: true });
+    // Manche finie : la suivante est une nouvelle manche
+    expect((await post("/rounds", "u1", { game: "se", context: "classique", sessionId: "g1" })).body.id).not.toBe(r1.id);
+  });
+
+  test("défi : deux départs simultanés ne font pas d'erreur", async () => {
+    const { post } = setup();
+    const [a, b] = await Promise.all([0, 1].map(() => post("/daily/start", "u1", { mode: "groupe", sessionId: "g1" })));
+    expect([a.status, b.status]).toEqual([200, 200]);
+    expect(b.body.mode).toBe("groupe");
+  });
+});

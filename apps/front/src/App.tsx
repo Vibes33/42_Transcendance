@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { post } from "./api/client";
 import { actions } from "./api/queries";
@@ -7,6 +7,7 @@ import { FriendsDrawer } from "./components/FriendsDrawer";
 import { Header } from "./components/Header";
 import { LoginDialog } from "./components/LoginDialog";
 import { Footer, NeedGroupDialog, Toasts } from "./components/Shell";
+import { Btn, Dialog } from "./components/ui";
 import { partieUrl } from "./lib/play";
 import { Accueil } from "./pages/Accueil";
 import { Boutique } from "./pages/Boutique";
@@ -21,6 +22,7 @@ import { Recap } from "./pages/Recap";
 import { Historique } from "./pages/Historique";
 import { Mayhem } from "./pages/Mayhem";
 import { Live, Obs, Stream } from "./pages/Stream";
+import { useT } from "./i18n";
 import { useApplyTheme, useMe } from "./state/app";
 import { connectLive, useLive } from "./state/live";
 import { useUi } from "./state/ui";
@@ -66,18 +68,20 @@ export function App() {
     }
   }, [session?.id]);
 
-  // Quitter la partie de groupe par un autre chemin que le bouton (menu du haut, retour arrière) :
-  // on libère le groupe, sinon il attendrait au récap un joueur qui n'est plus là
-  const prevPath = useRef(path);
+  // Sortie de la partie de groupe par un autre chemin que le bouton (menu du haut, retour arrière) :
+  // on demande confirmation. Le joueur reste dans la partie tant qu'il n'a pas choisi ; s'il la
+  // quitte, le groupe est libéré (sinon il attendrait au récap un joueur qui n'est plus là).
+  const prevUrl = useRef(path + loc.search);
+  const [leaving, setLeaving] = useState<{ id: string; back: string } | null>(null);
   useEffect(() => {
-    const was = prevPath.current;
-    prevPath.current = path;
-    const inGame = (p: string) => p === "/partie" || p === "/recap";
+    const was = prevUrl.current;
+    prevUrl.current = path + loc.search;
     const s = useLive.getState().session;
-    if (!inGame(was) || inGame(path) || !s || s.kind !== "group" || s.phase === "done") return;
-    useLive.getState().setSession(null);
-    post(`/api/temps-reel/sessions/${s.id}/leave`).catch(() => {});
-  }, [path]);
+    if (!inGame(was.split("?")[0]) || inGame(path) || !s || s.kind !== "group" || s.phase === "done") return;
+    setLeaving({ id: s.id, back: was });
+    // L'adresse de retour suit aussi les changements de partie sans changement de page
+  }, [path, loc.search]);
+  const askLeave = leaving && session?.id === leaving.id && session.phase !== "done" && !inGame(path) ? leaving : null;
 
   if (obs)
     return (
@@ -124,8 +128,44 @@ export function App() {
       {ui.friendsOpen && me.isUser && <FriendsDrawer />}
       {ui.login && path !== "/connexion" && <LoginDialog />}
       <NeedGroupDialog />
+      {askLeave && (
+        <LeaveGroupDialog
+          onBack={() => {
+            setLeaving(null);
+            nav(askLeave.back);
+          }}
+          onLeave={() => {
+            setLeaving(null);
+            useLive.getState().setSession(null);
+            post(`/api/temps-reel/sessions/${askLeave.id}/leave`).catch(() => {});
+          }}
+        />
+      )}
       <DevPanel />
       <Toasts />
     </div>
+  );
+}
+
+const inGame = (p: string) => p === "/partie" || p === "/recap";
+
+/** Le joueur a quitté la page de sa partie de groupe : y revenir, ou la quitter pour de bon. */
+function LeaveGroupDialog({ onBack, onLeave }: { onBack: () => void; onLeave: () => void }) {
+  const t = useT();
+  return (
+    <Dialog labelledBy="titre-quitter-groupe" width={520} z={60}>
+      <h2 id="titre-quitter-groupe" className="m-0 font-d font-bold text-[28px] leading-[1.1]">
+        {t("Quitter la partie de groupe ?")}
+      </h2>
+      <p className="m-0 max-w-[400px] text-[15px] leading-relaxed text-mut">{t("Ton groupe continuera sans toi et tu ne pourras plus revenir dans cette partie.")}</p>
+      <div className="flex flex-wrap justify-center gap-3 pt-1.5">
+        <Btn variant="soft" className="h-[52px] px-8 text-[15px]" onClick={onLeave}>
+          {t("Quitter la partie")}
+        </Btn>
+        <Btn className="h-[52px] px-8 text-[15px]" onClick={onBack}>
+          {t("Revenir à la partie")}
+        </Btn>
+      </div>
+    </Dialog>
   );
 }

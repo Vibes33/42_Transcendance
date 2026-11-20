@@ -347,6 +347,17 @@ export function createJeuxApp(deps: JeuxDeps) {
           if (!GAMES[game].classicPlayable) fail(403, "not_classic", "Ce jeu se joue uniquement dans le défi du jour.");
           if (caller.kind !== "user") fail(403, "account_required");
           if (!(await classicUnlocked(me, game))) fail(402, "locked", "Débloque ce jeu à la boutique pour y jouer en illimité.");
+          // Partie de groupe : une page rechargée (ou rouverte) reprend la manche en cours, sans
+          // nouveau contenu ni chrono remis à zéro
+          if (body.sessionId && game !== "mayhem") {
+            const open = db
+              .select()
+              .from(rounds)
+              .where(and(eq(rounds.userId, me), eq(rounds.sessionId, body.sessionId), eq(rounds.game, game), eq(rounds.over, false)))
+              .orderBy(desc(rounds.startedAt))
+              .get();
+            if (open) return toState(ENGINES[game].isOver(open.state, t) ? await finalize(open, t) : open, t);
+          }
           // World Mayhem dure plusieurs minutes : une page rechargée reprend le draft ou le tournoi en cours
           if (game === "mayhem") {
             const open = db
