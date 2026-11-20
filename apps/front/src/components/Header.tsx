@@ -24,9 +24,11 @@ export function Header() {
   const onlineCount = (friends.data?.friends ?? []).filter((f) => (presence[f.userId]?.state ?? f.presence) !== "offline").length;
   const path = loc.pathname;
   const inGameCtx = new URLSearchParams(loc.search).get("ctx");
+  // Récap : l'onglet suit la partie de groupe (défi du jour ou jeu classique)
+  const recapCtx = useLive((s) => s.session?.context);
   const on = {
-    defi: path === "/" || path === "/recap" || (path === "/partie" && inGameCtx === "defi"),
-    jeux: path === "/jeux" || path === "/mayhem" || (path === "/partie" && inGameCtx === "classique"),
+    defi: path === "/" || (path === "/recap" && recapCtx !== "classique") || (path === "/partie" && inGameCtx === "defi"),
+    jeux: path === "/jeux" || path === "/mayhem" || (path === "/recap" && recapCtx === "classique") || (path === "/partie" && inGameCtx === "classique"),
     classement: path === "/classement",
     boutique: path === "/boutique",
     compte: path === "/profil" || path === "/historique" || path === "/parametres" || path === "/stream"

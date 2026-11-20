@@ -405,6 +405,8 @@ export const EN: Record<string, string> = {
   "Victoire de": "Victory for",
   "Classement": "Leaderboard",
   "du défi": "of the challenge",
+  "de la partie": "of the game",
+  "Personne dans le groupe n’a débloqué ce jeu.": "Nobody in the group has unlocked this game.",
   "Points de chaque joueur par jeu": "Each player’s points per game",
   "Joueur": "Player",
   "Total": "Total",

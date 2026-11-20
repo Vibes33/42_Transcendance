@@ -305,9 +305,16 @@ export function createJeuxApp(deps: JeuxDeps) {
           const s = body.sessionId ? await deps.session(body.sessionId) : null;
           if (!s || s.kind !== "group" || !s.members.includes(me)) fail(403, "not_in_session");
         }
-        db.insert(daily)
+        // Deux départs simultanés (lancement du groupe + page de partie) : le second reprend le premier
+        const ins = db
+          .insert(daily)
           .values({ userId: me, day, kind: caller.kind === "guest" ? "guest" : "user", mode: body.mode, sessionId: body.sessionId ?? null, games: rotationFor(day), status: "running", deviceId: caller.device, startedAt: t })
-          .run();
+          .onConflictDoNothing()
+          .run() as unknown as { changes: number };
+        if (ins.changes === 0) {
+          if (dailyRow(me, day)?.mode !== body.mode) fail(409, "mode_locked", body.mode === "solo" ? "Tu as déjà commencé le défi du jour en groupe." : "Tu as déjà commencé le défi du jour en solo.");
+          return dailyState(me, t);
+        }
         await deps.publish("defi.started", { userId: me, day, mode: body.mode, groupSessionId: body.sessionId ?? null, games: rotationFor(day) });
         return dailyState(me, t);
       },

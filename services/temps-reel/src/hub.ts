@@ -43,6 +43,8 @@ export interface HubDeps {
   projections: (ids: string[], day: string) => Promise<Record<string, Record<string, { base: number; projected: number }>>>;
   /** Met à 0 les jeux du défi manqués avant `upTo` (retour dans le groupe après une déconnexion). */
   forfeit: (userId: string, day: string, upTo: GameKey) => Promise<void>;
+  /** L'utilisateur possède-t-il cet objet (jeu classique débloqué : "game:meli") ? */
+  owns: (userId: string, item: string) => Promise<boolean>;
   now?: () => number;
   /** Délai avant de considérer un joueur comme déconnecté (il peut recharger sa page). */
   graceMs?: number;
@@ -247,6 +249,9 @@ export class Hub {
       if (!m!.modes.includes("groupe")) fail(409, "solo_only", "Ce jeu se joue seul.");
       if (g!.members.length < m!.minPlayers) fail(409, "not_enough_players", `Il faut au moins ${m!.minPlayers} joueurs pour ce jeu.`);
       if (g!.members.length > m!.maxPlayers) fail(409, "too_many_players", `Ce jeu se joue à ${m!.maxPlayers} au plus.`);
+      // Un membre qui a débloqué le jeu suffit pour tout le groupe ; sinon personne ne pourrait jouer
+      const owned = await Promise.all(g!.members.map((u) => this.deps.owns(u, "game:" + game).catch(() => false)));
+      if (!owned.some(Boolean)) fail(402, "locked", "Personne dans le groupe n’a débloqué ce jeu.");
       games = [game!];
     }
     const s: Internal = {

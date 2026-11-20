@@ -44,12 +44,13 @@ function PartiePage() {
   const namesLang = me.profile?.namesLang ?? "fr";
 
   // Session de groupe ou de stream absente après un rechargement : on la redemande au serveur
+  // (pas après une erreur : la page a quitté la session, la recharger relancerait la manche en boucle)
   useEffect(() => {
-    if (sessionId && !session && !useLive.getState().session)
+    if (sessionId && !session && !useLive.getState().session && !error)
       get<LiveSession>(`/api/temps-reel/sessions/${sessionId}`)
         .then((s) => useLive.getState().setSession(s))
         .catch(() => setError(t("Cette partie n’existe plus.")));
-  }, [sessionId, !!session]);
+  }, [sessionId, !!session, !!error]);
 
   const daily = me.daily;
   // Jeu à jouer d'après le serveur ; la manche affichée garde le sien jusqu'à « Jeu suivant »
@@ -92,6 +93,8 @@ function PartiePage() {
     if (sessionId && !session) return;
     if (session && session.phase !== "playing") return;
     if (myMember && myMember.status === "away") return;
+    // Partie quittée (ou manche impossible à créer) : on ne la relance pas
+    if (error || (myMember && myMember.status === "left")) return;
     if (creating.current === roundKey) return;
     creating.current = roundKey;
     setError(null);

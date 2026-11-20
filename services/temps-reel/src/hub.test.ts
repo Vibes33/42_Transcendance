@@ -12,6 +12,7 @@ function setup() {
     friendsOf: async () => [],
     projections: async (ids) => Object.fromEntries(ids.map((id) => [id, {}])),
     forfeit: async (u, _d, upTo) => void forfeits.push(`${u}:${upTo}`),
+    owns: async () => true,
     graceMs: 0
   });
   const inbox: Record<string, WsServerMessage[]> = {};

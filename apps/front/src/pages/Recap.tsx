@@ -100,7 +100,7 @@ export function Recap() {
             : t("Partie classique en groupe · manche {n}", { n: lastIdx + 1 })}
         </span>
         <h1 className="m-0 font-d font-bold leading-[1.02] uppercase" style={{ fontSize: "clamp(34px, 3.6vw, 52px)" }}>
-          {final ? t("Victoire de") : t("Classement")} <span className="text-acc">{final ? winner?.pseudo : t("du défi")}</span>
+          {final ? t("Victoire de") : t("Classement")} <span className="text-acc">{final ? winner?.pseudo : session.context === "defi" ? t("du défi") : t("de la partie")}</span>
         </h1>
       </div>
 

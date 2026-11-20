@@ -21,7 +21,8 @@ const hub = new Hub({
   projections: (ids, day) => internal("classement", "/api/classement/internal/projections", { body: { ids, day } }),
   forfeit: async (userId, day, upTo) => {
     await internal("jeux", "/api/jeux/internal/forfeit", { body: { userId, day, upTo } });
-  }
+  },
+  owns: async (userId, item) => (await internal<{ owns: boolean }>("classement", `/api/classement/internal/owns?userId=${userId}&item=${encodeURIComponent(item)}`)).owns
 });
 
 createTempsReelApp(hub).listen({ port: 3000, hostname: "0.0.0.0" });
