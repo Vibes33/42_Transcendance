@@ -45,6 +45,8 @@ export interface HubDeps {
   forfeit: (userId: string, day: string, upTo: GameKey) => Promise<void>;
   /** L'utilisateur possède-t-il cet objet (jeu classique débloqué : "game:meli") ? */
   owns: (userId: string, item: string) => Promise<boolean>;
+  /** Défi du jour d'un joueur (service jeux) : à faire, en cours, fini ou clos, et son mode. */
+  daily: (userId: string) => Promise<{ status: "todo" | "running" | "done" | "closed"; mode: "solo" | "groupe" | null }>;
   now?: () => number;
   /** Délai avant de considérer un joueur comme déconnecté (il peut recharger sa page). */
   graceMs?: number;
@@ -242,7 +244,13 @@ export class Hub {
       await this.close(running);
     }
     let games: GameKey[];
-    if (context === "defi") games = rotationFor(day);
+    if (context === "defi") {
+      // Défi déjà fini ou commencé seul : pas de partie de groupe (chacun la quitterait aussitôt)
+      const d = await this.deps.daily(leader).catch(() => null);
+      if (d && (d.status === "done" || d.status === "closed")) fail(409, "defi_done", "Tu as déjà terminé le défi du jour.");
+      if (d?.status === "running" && d.mode === "solo") fail(409, "mode_locked", "Tu as déjà commencé le défi du jour en solo.");
+      games = rotationFor(day);
+    }
     else {
       const m = game ? GAMES[game] : undefined;
       if (!m?.classicPlayable) fail(400, "not_classic");

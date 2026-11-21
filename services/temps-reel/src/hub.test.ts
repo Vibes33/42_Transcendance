@@ -13,6 +13,7 @@ function setup() {
     projections: async (ids) => Object.fromEntries(ids.map((id) => [id, {}])),
     forfeit: async (u, _d, upTo) => void forfeits.push(`${u}:${upTo}`),
     owns: async () => true,
+    daily: async (u) => (u === "done" ? { status: "done", mode: "groupe" } : { status: "todo", mode: null }),
     graceMs: 0
   });
   const inbox: Record<string, WsServerMessage[]> = {};
@@ -25,6 +26,11 @@ const finished = (sessionId: string, userId: string, result: RoundResult, basePo
   ({ sessionId, userId, game: result.game, context: "defi" as const, result, basePoints });
 
 describe("groupe", () => {
+  test("défi du jour déjà fini par le chef : pas de nouvelle partie de groupe", async () => {
+    const { hub } = setup();
+    await expect(hub.createGroup("done", "defi")).rejects.toMatchObject({ code: "defi_done" });
+  });
+
   test("récap quand tout le monde a fini, puis barrière « prêt »", async () => {
     const { hub } = setup();
     const s = await hub.createGroup("a", "defi");

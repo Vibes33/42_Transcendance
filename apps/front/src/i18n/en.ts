@@ -406,6 +406,7 @@ export const EN: Record<string, string> = {
   "Classement": "Leaderboard",
   "du défi": "of the challenge",
   "de la partie": "of the game",
+  "Tu as déjà terminé le défi du jour.": "You’ve already finished today’s challenge.",
   "Classement du jour": "Today’s ranking",
   "{game} : {rank} sur {total}.": "{game}: {rank} of {total}.",
   "Masquer": "Hide",

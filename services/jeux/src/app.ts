@@ -719,6 +719,11 @@ export function createJeuxApp(deps: JeuxDeps) {
       g
         .use(internalGuard)
         // Fusion invité → compte : le défi du jour de l'invité passe au compte, sauf si le compte l'a déjà fait.
+        // Défi du jour d'un joueur (temps réel : on ne relance pas en groupe un défi déjà fini)
+        .get("/daily/:userId", async ({ params }) => {
+          const d = await dailyState(params.userId, now());
+          return { status: d.status, mode: d.mode };
+        })
         .post("/merge", ({ body }) => ({ moved: mergeGuest(db, body.guestId, body.userId, body.day, now()) }), {
           body: t.Object({ guestId: t.String(), userId: t.String(), day: t.String() })
         })

@@ -63,7 +63,7 @@ export function ChampionParfait({ round, act, flow, namesLang }: GameProps<Pub>)
                       VS
                     </span>
                   )}
-                  <button type="button" onClick={() => act({ type: "pick", champion: id }).catch(() => null)} aria-label={t("Choisir {name}", { name: name(id) })} className="relative w-[min(400px,80vw)] h-[min(520px,60vh)] p-[2px] border-0 bg-line cut-lg cursor-pointer transition-transform hover:-translate-y-1">
+                  <button type="button" onClick={() => act({ type: "pick", champion: id }).catch(() => null)} aria-label={t("Choisir {name}", { name: name(id) })} className="relative w-[min(400px,80vw)] p-[2px] border-0 bg-line cut-lg cursor-pointer transition-transform hover:-translate-y-1" style={{ height: DUEL_H }}>
                     <span className="absolute inset-[2px] block overflow-hidden bg-surf2 cut-lg">
                       {c && <img src={splashImg(c)} alt="" className="block w-full h-full object-cover" style={{ objectPosition: "60% 20%" }} />}
                       <span className="absolute inset-x-0 bottom-0 flex flex-col gap-1 px-7 pt-20 pb-6 text-left" style={{ background: "linear-gradient(transparent, color-mix(in srgb, var(--bg) 92%, transparent))" }}>
@@ -153,3 +153,6 @@ export function ChampionParfait({ round, act, flow, namesLang }: GameProps<Pub>)
     </div>
   );
 }
+
+/** Hauteur des cartes du duel : le bouton « Je n’arrive pas à choisir » reste visible sans défiler. */
+const DUEL_H = "min(520px, max(300px, calc(100svh - 460px)))";

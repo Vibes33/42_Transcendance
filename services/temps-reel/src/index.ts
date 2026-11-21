@@ -22,6 +22,7 @@ const hub = new Hub({
   forfeit: async (userId, day, upTo) => {
     await internal("jeux", "/api/jeux/internal/forfeit", { body: { userId, day, upTo } });
   },
+  daily: (userId) => internal("jeux", `/api/jeux/internal/daily/${userId}`),
   owns: async (userId, item) => (await internal<{ owns: boolean }>("classement", `/api/classement/internal/owns?userId=${userId}&item=${encodeURIComponent(item)}`)).owns
 });
 

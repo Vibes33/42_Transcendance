@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FriendEntry } from "@loltr/shared";
 import { del, post } from "../api/client";
 import { keys, useFriends, useInvalidate } from "../api/queries";
@@ -35,6 +35,19 @@ export function FriendsDrawer() {
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
   const [reporting, setReporting] = useState<FriendEntry | null>(null);
+
+  // Échap ferme ce qui est ouvert par-dessus (signalement, menu d'un ami), sinon le tiroir, où que
+  // soit le focus : à l'ouverture, il est resté sur le bouton du header
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (reporting) setReporting(null);
+      else if (menu) setMenu(null);
+      else ui.setFriends(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menu, reporting]);
 
   const run = async (fn: () => Promise<unknown>, after?: string) => {
     try {
@@ -82,7 +95,6 @@ export function FriendsDrawer() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="titre-amis"
-        onKeyDown={(e) => e.key === "Escape" && ui.setFriends(false)}
       >
         <div className="flex items-start justify-between gap-3 px-[22px] pt-[22px] pb-4">
           <div className="flex flex-col gap-0.5">
