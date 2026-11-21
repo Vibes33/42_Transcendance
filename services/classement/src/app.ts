@@ -62,7 +62,9 @@ export function createClassementApp(deps: ClassementDeps) {
         season: { number: season.number, endsAt: season.endsAt, progress: season.progress, points: rank.points, daysPlayed: rank.daysPlayed },
         rank: { tier: rank.id, division: rank.division, position: rank.position, total: rank.total },
         today: { projected: projectedTotal(db, me, today), games: projection(db, me, today), unlocks: dailyUnlocksOf(db, me, today) },
-        recentShards: recent.map((l) => ({ delta: l.delta, reason: l.reason, ref: l.ref, at: l.at }))
+        recentShards: recent.map((l) => ({ delta: l.delta, reason: l.reason, ref: l.ref, at: l.at })),
+        // Points du défi pas encore convertis en éclats (les points du jour s'y ajoutent à 3 h)
+        points: { carry: db.select({ c: wallets.pointsCarry }).from(wallets).where(eq(wallets.userId, me)).get()?.c ?? 0 }
       };
     })
     // Historique du défi du jour, jour par jour

@@ -45,6 +45,8 @@ export interface ClassementMe {
   rank: { tier: string; division: number | null; position: number | null; total: number };
   today: { projected: number; games: Record<string, { base: number; bonus: number; projected: number }>; unlocks: string[] };
   recentShards: { delta: number; reason: string; ref: string; at: number }[];
+  /** Points du défi pas encore convertis en éclats, gardés d'un jour à l'autre. */
+  points: { carry: number };
 }
 
 export interface HistoryGame {

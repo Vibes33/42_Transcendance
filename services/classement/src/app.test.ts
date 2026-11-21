@@ -40,6 +40,29 @@ describe("classement", () => {
     expect(streakOf(db, "u1", "2026-10-25").current).toBe(0);
   });
 
+  test("série : un jeu du défi terminé suffit, sans finir le défi (règle P2)", () => {
+    const db = createDb(":memory:");
+    for (const d of ["2026-10-19", "2026-10-20", "2026-10-21"]) recordResult(db, { ...cdj("u1", 3), day: d }, T);
+    expect(streakOf(db, "u1", "2026-10-21").current).toBe(3);
+    // Un jour sans aucun jeu : la série repart
+    recordResult(db, { ...cdj("u1", 3), day: "2026-10-23" }, T);
+    expect(streakOf(db, "u1", "2026-10-23").current).toBe(1);
+    expect(streakOf(db, "u1", "2026-10-23").best).toBe(3);
+  });
+
+  test("éclats par tranche de 500 : les points se cumulent d'un jour à l'autre (règle P3)", () => {
+    const db = createDb(":memory:");
+    // Seul joueur : Champion du jour trouvé = 100 + 150 de bonus = 250 points par jour
+    for (const d of ["2026-10-19", "2026-10-20", "2026-10-21"]) recordResult(db, { ...cdj("u1", 1), day: d }, T);
+    finalizeDays(db, Date.UTC(2026, 9, 25, 12));
+    // 750 points cumulés : une tranche (10 éclats), 250 gardés ; plus 3 × 30 pour le champion trouvé
+    expect(balanceOf(db, "u1")).toBe(3 * 30 + 10);
+    recordResult(db, { ...cdj("u1", 1), day: "2026-10-25" }, T);
+    finalizeDays(db, Date.UTC(2026, 9, 27, 12));
+    // 250 gardés + 250 = 500 : une nouvelle tranche
+    expect(balanceOf(db, "u1")).toBe(4 * 30 + 20);
+  });
+
   test("position mondiale : mêmes points que le classement, journée en cours comprise", () => {
     const db = createDb(":memory:");
     const yesterday = dayKey(T - 86_400_000);

@@ -57,7 +57,12 @@ export const weeks = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.week] })]
 );
 
-export const wallets = sqliteTable("wallets", { userId: text("user_id").primaryKey(), balance: integer("balance").notNull().default(0) });
+/** Solde d'éclats, et points du défi pas encore convertis (reste sous une tranche de 500, gardé pour la suite). */
+export const wallets = sqliteTable("wallets", {
+  userId: text("user_id").primaryKey(),
+  balance: integer("balance").notNull().default(0),
+  pointsCarry: integer("points_carry").notNull().default(0)
+});
 
 /** Journal des éclats ; (joueur, motif, référence) unique pour qu'un gain ne soit jamais versé deux fois. */
 export const ledger = sqliteTable(

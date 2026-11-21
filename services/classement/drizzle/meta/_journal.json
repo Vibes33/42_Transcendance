@@ -15,6 +15,13 @@
       "when": 1794925143451,
       "tag": "0001_community_rounds",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1795264099602,
+      "tag": "0002_points_carry",
+      "breakpoints": true
     }
   ]
 }

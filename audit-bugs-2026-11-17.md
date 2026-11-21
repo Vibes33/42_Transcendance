@@ -209,8 +209,8 @@ Ce qui a été vérifié et trouvé correct est listé à la fin.
 
 ## Points de règle à trancher en équipe
 - **P1.** Un streamer doit-il posséder le jeu classique qu'il diffuse ?
-- **P2.** La série compte-t-elle les jours **joués** (CLAUDE.md) ou les défis **terminés** (le code) ?
-- **P3.** Les 10 éclats par tranche de 500 points : calcul par jour (reste perdu) ou cumulé ?
+- **P2.** La série compte-t-elle les jours **joués** (CLAUDE.md) ou les défis **terminés** (le code) ? **Tranché le 21/11 :** jours joués, un jeu du défi terminé suffit (règle B19 corrigée du même coup).
+- **P3.** Les 10 éclats par tranche de 500 points : calcul par jour (reste perdu) ou cumulé ? **Tranché le 21/11 :** cumulé d'un jour à l'autre, le reste est gardé (`wallets.points_carry`, B20 corrigé) ; le profil montre la progression vers les prochains éclats.
 - **P4.** Splash mystère trouvé sans le skin (70 points) : compte-t-il comme réussi pour le second déblocage ?
 - **P5.** Tolérance aux fautes : 0 faute pour les noms de 3 lettres ou moins et 1 pour 5 lettres ou moins, alors que la spécification dit ≤ 2. « Sena » est refusé à cause d'une égalité avec Sona.
 - **P6.** Accent de l'étape « premier chibi » : jaune Lux (CLAUDE.md) ou celui du chibi sélectionné (le code) ?

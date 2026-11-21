@@ -144,7 +144,7 @@ export function Boutique() {
             title={t("Points et défis du jour")}
             sub={t("Chaque jour, même sans finir haut au classement.")}
             rows={[
-              [t("Tranche de 500 points marqués"), SHARDS.per500Points],
+              [t("Tous les {n} points, cumulés de jour en jour", { n: fmt(SHARDS.pointsPerChunk) }), SHARDS.per500Points],
               [t("Défi du jour terminé"), SHARDS.dailyCompleted],
               [t("Champion du jour trouvé"), SHARDS.cdjFound],
               [t("{n} défis dans la semaine", { n: SHARDS.weeklyBonus.minDays }), SHARDS.weeklyBonus.shards]

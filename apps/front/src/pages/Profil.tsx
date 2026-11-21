@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { CHIBIS, CHIBI_BY_KEY, RANDOM_ART, type Chibi } from "@loltr/content/lite";
-import type { Profile } from "@loltr/shared";
+import { SHARDS, type Profile } from "@loltr/shared";
 import { post } from "../api/client";
 import { keys, queryClient, useInventory, useLeaderboard, useStats } from "../api/queries";
 import { ArrowBtn, Bar } from "../components/ui";
@@ -228,6 +228,7 @@ export function Profil() {
               <span className="font-d font-medium text-xl text-mut">/ 1 000</span>
             </div>
             <Bar pct={(projected / 1000) * 100} label={t("{n} points sur 1 000", { n: projected })} />
+            {cl && <NextShards carry={cl.points?.carry ?? 0} today={projected} />}
           </Panel>
           <Panel gap="gap-2.5">
             <span className="label">{t("Rang du joueur")}</span>
@@ -453,5 +454,32 @@ function RankEmblem({ tier, width }: { tier: string; width: number }) {
         style={{ width: EMBLEM_BOX.imgW * k, height: EMBLEM_BOX.imgH * k, left: -EMBLEM_BOX.x * k, top: -EMBLEM_BOX.y * k }}
       />
     </span>
+  );
+}
+
+/**
+ * Progression vers les prochains éclats : les points du défi se cumulent d'un jour à l'autre, et
+ * chaque tranche de 500 rapporte 10 éclats au passage de 3 h. Le reste est gardé pour la suite.
+ */
+function NextShards({ carry, today }: { carry: number; today: number }) {
+  const t = useT();
+  const step = SHARDS.pointsPerChunk;
+  const sum = carry + today;
+  const soon = Math.floor(sum / step) * SHARDS.per500Points;
+  const have = sum % step;
+  return (
+    <div className="flex flex-col gap-1.5 pt-3 mt-1 border-t border-line">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="label">{t("Prochains éclats")}</span>
+        <span className="text-[13px] text-mut">{t("+{n} tous les {step} points", { n: SHARDS.per500Points, step: fmt(step) })}</span>
+      </div>
+      <div className="flex items-baseline gap-2">
+        <span className="font-d font-bold text-2xl leading-none">{fmt(have)}</span>
+        <span className="font-d font-medium text-base text-mut">/ {fmt(step)}</span>
+        {soon > 0 && <span className="ml-auto text-[13.5px] font-bold text-ok">{t("+{n} éclats cette nuit", { n: soon })}</span>}
+      </div>
+      <Bar pct={(have / step) * 100} color="var(--ok)" label={t("{n} points sur {step} avant les prochains éclats", { n: have, step })} />
+      <span className="text-[12.5px] text-mut">{t("Tes points s’additionnent d’un jour à l’autre : le reste n’est jamais perdu.")}</span>
+    </div>
   );
 }

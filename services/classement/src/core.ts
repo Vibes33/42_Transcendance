@@ -147,6 +147,8 @@ export function recordResult(db: Db, ev: { userId: string; kind: "user" | "guest
       .onConflictDoNothing()
       .run();
     tx.insert(days).values({ userId: ev.userId, day: ev.day, kind: ev.kind }).onConflictDoNothing().run();
+    // La série compte les jours joués : un jeu du défi terminé suffit (règle P2)
+    markPlayed(tx, ev.userId, ev.day);
     // À confirmer (section 17) : 30 éclats pour un Champion du jour trouvé
     if (ev.game === "cdj" && ev.result.found && SHARDS.cdjFound > 0) credit(tx, ev.userId, SHARDS.cdjFound, "cdj_found", ev.day, at);
   });
@@ -155,8 +157,22 @@ export function recordResult(db: Db, ev: { userId: string; kind: "user" | "guest
 }
 
 /**
- * Le jour passe à « terminé » : 10 éclats, série, semaine et bonus hebdomadaire. Ne fait rien si le
- * jour l'était déjà (événement rejoué ou reçu en double) : la semaine n'est comptée qu'une fois.
+ * Jour joué (un jeu du défi terminé) : la série avance d'un jour, ou repart à 1 après un trou. Un
+ * jour déjà compté, ou plus ancien que le dernier jour compté, ne change rien.
+ */
+function markPlayed(tx: Tx, userId: string, day: string) {
+  const s = tx.select().from(streaks).where(eq(streaks.userId, userId)).get();
+  if (!s) tx.insert(streaks).values({ userId, current: 1, best: 1, lastDay: day }).run();
+  else if (!s.lastDay || s.lastDay < day) {
+    const current = s.lastDay === addDays(day, -1) ? s.current + 1 : 1;
+    tx.update(streaks).set({ current, best: Math.max(s.best, current), lastDay: day }).where(eq(streaks.userId, userId)).run();
+  }
+}
+
+/**
+ * Le jour passe à « terminé » : 10 éclats, semaine et bonus hebdomadaire (la série, elle, avance dès
+ * le premier jeu terminé). Ne fait rien si le jour l'était déjà (événement rejoué ou reçu en
+ * double) : la semaine n'est comptée qu'une fois.
  */
 function completeDay(tx: Tx, userId: string, day: string, kind: "user" | "guest", at: number): boolean {
   const ch = tx
@@ -166,13 +182,6 @@ function completeDay(tx: Tx, userId: string, day: string, kind: "user" | "guest"
     .run() as unknown as { changes: number };
   if (ch.changes === 0) return false;
   credit(tx, userId, SHARDS.dailyCompleted, "daily_completed", day, at);
-  const s = tx.select().from(streaks).where(eq(streaks.userId, userId)).get();
-  if (!s) tx.insert(streaks).values({ userId, current: 1, best: 1, lastDay: day }).run();
-  // Un jour plus ancien que le dernier jour compté ne touche pas à la série
-  else if (!s.lastDay || s.lastDay < day) {
-    const current = s.lastDay === addDays(day, -1) ? s.current + 1 : 1;
-    tx.update(streaks).set({ current, best: Math.max(s.best, current), lastDay: day }).where(eq(streaks.userId, userId)).run();
-  }
   const week = weekKey(day);
   tx.insert(weeks)
     .values({ userId, week, completed: 1 })
@@ -183,7 +192,7 @@ function completeDay(tx: Tx, userId: string, day: string, kind: "user" | "guest"
   return true;
 }
 
-/** Défi du jour terminé : 10 éclats, série, et 50 éclats au 5e défi de la semaine. */
+/** Défi du jour terminé : 10 éclats, et 50 éclats au 5e défi de la semaine. */
 export function recordCompleted(db: Db, userId: string, day: string, at: number, kind: "user" | "guest" = "user"): boolean {
   if (isFinalized(db, day)) return false;
   return db.transaction((tx) => completeDay(tx, userId, day, kind, at));
@@ -199,7 +208,8 @@ export function streakOf(db: Db, userId: string, today: string): { current: numb
 
 /**
  * Clôt les jours passés (après 3 h 30, pour inclure les défis finis en retard) :
- * bonus de percentile définitifs, points de saison, 10 éclats par tranche de 500 points.
+ * bonus de percentile définitifs, points de saison, 10 éclats par tranche de 500 points. Les points
+ * se cumulent d'un jour à l'autre (règle P3) : le reste sous une tranche est gardé, pas perdu.
  */
 export function finalizeDays(db: Db, now: number, credited?: Set<string>): string[] {
   const today = dayKey(now);
@@ -222,8 +232,11 @@ export function finalizeDays(db: Db, now: number, credited?: Set<string>): strin
             .values({ userId: p.userId, season, points: total, daysPlayed: 1 })
             .onConflictDoUpdate({ target: [seasonPoints.userId, seasonPoints.season], set: { points: sql`${seasonPoints.points} + ${total}`, daysPlayed: sql`${seasonPoints.daysPlayed} + 1` } })
             .run();
-        const chunks = Math.floor(total / 500);
+        const carry = (tx.select({ c: wallets.pointsCarry }).from(wallets).where(eq(wallets.userId, p.userId)).get()?.c ?? 0) + total;
+        const chunks = Math.floor(carry / SHARDS.pointsPerChunk);
         if (chunks > 0 && credit(tx, p.userId, chunks * SHARDS.per500Points, "points_500", day, now)) credited?.add(p.userId);
+        const rest = carry - chunks * SHARDS.pointsPerChunk;
+        tx.insert(wallets).values({ userId: p.userId, balance: 0, pointsCarry: rest }).onConflictDoUpdate({ target: wallets.userId, set: { pointsCarry: rest } }).run();
       }
       tx.insert(finalizedDays).values({ day, at: now }).run();
     });
@@ -332,7 +345,8 @@ export function mergeGuest(db: Db, guestId: string, userId: string, day: string,
   if (db.select().from(results).where(and(eq(results.userId, userId), eq(results.day, day))).get()) return false;
   const guestDay = db.select().from(days).where(and(eq(days.userId, guestId), eq(days.day, day))).get();
   db.transaction((tx) => {
-    tx.update(results).set({ userId, kind: "user" }).where(and(eq(results.userId, guestId), eq(results.day, day))).run();
+    const movedResults = tx.update(results).set({ userId, kind: "user" }).where(and(eq(results.userId, guestId), eq(results.day, day))).run() as unknown as { changes: number };
+    if (movedResults.changes > 0) markPlayed(tx, userId, day);
     if (guestDay) {
       tx.delete(days).where(and(eq(days.userId, guestId), eq(days.day, day))).run();
       tx.insert(days).values({ userId, day, kind: "user", completed: false, finalTotal: guestDay.finalTotal }).onConflictDoNothing().run();
@@ -345,6 +359,12 @@ export function mergeGuest(db: Db, guestId: string, userId: string, day: string,
     const moved = entries.reduce((a, e) => a + e.delta, 0);
     tx.delete(ledger).where(and(eq(ledger.userId, guestId), eq(ledger.ref, day))).run();
     tx.update(wallets).set({ balance: sql`max(0, ${wallets.balance} - ${moved})` }).where(eq(wallets.userId, guestId)).run();
+    // Points pas encore convertis de l'invité : ils rejoignent le reste du compte
+    const guestCarry = tx.select({ c: wallets.pointsCarry }).from(wallets).where(eq(wallets.userId, guestId)).get()?.c ?? 0;
+    if (guestCarry > 0) {
+      tx.insert(wallets).values({ userId, balance: 0, pointsCarry: guestCarry }).onConflictDoUpdate({ target: wallets.userId, set: { pointsCarry: sql`${wallets.pointsCarry} + ${guestCarry}` } }).run();
+      tx.update(wallets).set({ pointsCarry: 0 }).where(eq(wallets.userId, guestId)).run();
+    }
   });
   resultsChanged(db);
   return true;

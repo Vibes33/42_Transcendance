@@ -139,6 +139,8 @@ export const SHARDS = {
   seasonFriendsParticipation: 15,
   seasonFriendsMinActive: 4,
   per500Points: 10,
+  /** Taille d'une tranche : les points du défi se cumulent d'un jour à l'autre, le reste est gardé. */
+  pointsPerChunk: 500,
   dailyCompleted: 10,
   /** À confirmer (section 17) : bonus de 30 éclats pour un Champion du jour trouvé. */
   cdjFound: 30,
