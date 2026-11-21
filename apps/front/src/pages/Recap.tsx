@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import type { LiveMember, LiveSession } from "@loltr/shared";
+import { RANKED_GAMES, type LiveMember, type LiveSession } from "@loltr/shared";
 import { get, post } from "../api/client";
 import { keys, queryClient } from "../api/queries";
+import { DayRankLine } from "../components/DayRanking";
 import { Btn, glow } from "../components/ui";
 import { Check } from "../components/icons";
 import { useT } from "../i18n";
@@ -183,6 +184,8 @@ export function Recap() {
           </div>
         </div>
       </div>
+
+      {RANKED_GAMES.includes(session.games[lastIdx]) && <DayRankLine game={session.games[lastIdx]} />}
 
       <div className="flex flex-col items-center gap-2.5">
         {final ? (

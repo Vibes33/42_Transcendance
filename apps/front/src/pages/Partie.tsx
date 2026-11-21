@@ -190,6 +190,7 @@ function PartiePage() {
       : [];
     return {
       ctx,
+      game,
       multi,
       rank,
       total: daily?.games.length ?? 4,

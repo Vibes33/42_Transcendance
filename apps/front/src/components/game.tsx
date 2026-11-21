@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { LITE_CHAMPIONS, squareImg } from "@loltr/content/lite";
-import { normalize, suggest, type GameKey, type LiveMember } from "@loltr/shared";
+import { RANKED_GAMES, normalize, suggest, type GameKey, type LiveMember } from "@loltr/shared";
 import { useT } from "../i18n";
 import { avatarOf } from "../lib/chibi";
 import { GAME_TITLE } from "../lib/games";
 import { clock } from "../lib/time";
 import { useMe } from "../state/app";
+import { DayRankLine } from "./DayRanking";
 import { Back } from "./icons";
 
 // Briques communes à tous les jeux (contrat de jeu) : barre du haut, saisie avec autocomplétion,
@@ -14,6 +15,8 @@ import { Back } from "./icons";
 /** Déroulement de la partie, fourni par la page Partie à chaque jeu. */
 export interface GameFlow {
   ctx: "defi" | "classique" | "streamer";
+  /** Jeu de la manche : la fin de partie affiche mon rang du jour sur ce jeu. */
+  game?: GameKey;
   multi: boolean;
   /** Rang du jeu dans le défi (1 à 4). */
   rank: number;
@@ -347,6 +350,11 @@ export function EndDialog({
               </div>
             ))}
           </div>
+          {flow.game && !flow.demo && flow.ctx !== "streamer" && RANKED_GAMES.includes(flow.game) && (
+            <div className="flex justify-center w-full px-6 box-border">
+              <DayRankLine game={flow.game} />
+            </div>
+          )}
           {flow.extra}
           {waiting && (
             <div className="flex flex-col gap-1.5 w-[calc(100%-72px)] max-w-[380px] text-left">
