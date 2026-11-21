@@ -87,6 +87,9 @@ export const MELI_START_MS = 30_000;
 export const MELI_BONUS_MS = 5_000;
 export const SE_START_MS = 30_000;
 export const SE_BONUS_MS = 3_000;
+/** Temps retiré au chrono à chaque erreur (Méli-MéLoL : mauvaise case ; Sorts éclair : mauvais champion). */
+export const MELI_ERROR_MS = 1_000;
+export const SE_ERROR_MS = 1_000;
 /** Défloutage avant le départ du chrono (Méli-MéLoL et Sorts éclair). */
 export const WARMUP_MS = 1_000;
 /** Splash mystère : dézoom en 6 crans, un par erreur. */

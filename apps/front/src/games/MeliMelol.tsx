@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { LITE_BY_ID, squareImg } from "@loltr/content/lite";
-import { MELI_START_MS, SUCCESS, WARMUP_MS } from "@loltr/shared";
+import { MELI_ERROR_MS, MELI_START_MS, SUCCESS, WARMUP_MS } from "@loltr/shared";
 import { EndDialog, GameBar, TimerBar, modeSub, pointsLabel, pointsText } from "../components/game";
 import { useT } from "../i18n";
 import { useNow } from "../lib/time";
@@ -30,6 +30,7 @@ export function MeliMelol({ round, act, finish, flow, groupSize, namesLang }: Ga
   // En démo (tutoriel), le temps est figé à la fin du flou de départ
   const now = flow.demo ? pub.warmUntil : tick;
   const [wrong, setWrong] = useState<{ tile: number; at: number } | null>(null);
+  const [penalty, setPenalty] = useState<{ ms: number; at: number } | null>(null);
   const [bonusAt, setBonusAt] = useState(0);
   const finishing = useRef(false);
 
@@ -54,6 +55,7 @@ export function MeliMelol({ round, act, finish, flow, groupSize, namesLang }: Ga
     if (over || warming || pub.found.includes(tile)) return;
     const res = await act({ type: "click", tile }).catch(() => null);
     if (res?.feedback?.wrong !== undefined) setWrong({ tile, at: Date.now() });
+    if (res?.feedback?.penaltyMs) setPenalty({ ms: -res.feedback.penaltyMs, at: Date.now() });
     if (res?.feedback?.completed) setBonusAt(Date.now());
   };
 
@@ -84,7 +86,7 @@ export function MeliMelol({ round, act, finish, flow, groupSize, namesLang }: Ga
                 ))}
               </div>
             </div>
-            <TimerBar leftMs={warming ? MELI_START_MS : leftMs} totalMs={MELI_START_MS} tuto="meli-timer" />
+            <TimerBar leftMs={warming ? MELI_START_MS : leftMs} totalMs={MELI_START_MS} tuto="meli-timer" delta={penalty} />
           </div>
 
           <div className="relative max-w-full overflow-x-auto">
@@ -131,7 +133,7 @@ export function MeliMelol({ round, act, finish, flow, groupSize, namesLang }: Ga
             )}
           </div>
           <span aria-live="polite" className="text-sm text-mut">
-            {t("{n} sur 4 · une erreur fait trembler la case, sans pénalité", { n: pub.found.length })}
+            {t("{n} sur 4 · une erreur retire {s} s au chrono", { n: pub.found.length, s: MELI_ERROR_MS / 1000 })}
           </span>
         </div>
         {flow.side}

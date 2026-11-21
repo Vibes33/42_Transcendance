@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import type { GameKey } from "@loltr/shared";
+import { MELI_ERROR_MS, SE_ERROR_MS, type GameKey } from "@loltr/shared";
 import { BuildPath } from "./BuildPath";
 import { ChampionDuJour } from "./ChampionDuJour";
 import { ChampionParfait } from "./ChampionParfait";
@@ -35,7 +35,7 @@ export const GAME_UI: Record<GameKey, { component: ComponentType<GameProps>; tut
     component: MeliMelol,
     tutorial: [
       { target: "meli-target", title: "Trouve les 4 sorts", text: "Un champion est affiché : retrouve ses 4 sorts dans la grille." },
-      { target: "meli-grid", title: "La grille", text: "Clique ses sorts parmi les 25 icônes. Une erreur fait trembler la case, sans pénalité." },
+      { target: "meli-grid", title: "La grille", text: "Clique ses sorts parmi les 25 icônes. Chaque erreur retire {s} s au chrono.", params: { s: MELI_ERROR_MS / 1000 } },
       { target: "meli-timer", title: "Course contre la montre", text: "30 secondes au départ, +5 s par champion complété. La grille se dévoile en 1 seconde, puis le chrono démarre." },
       { target: "meli-counter", title: "Réussite", text: "Au défi du jour, plus de 10 champions complétés rapportent les 100 points de base." }
     ]
@@ -45,7 +45,7 @@ export const GAME_UI: Record<GameKey, { component: ComponentType<GameProps>; tut
     tutorial: [
       { target: "se-icon", title: "À qui est ce sort ?", text: "Une icône de sort s’affiche : à quel champion appartient-elle ?" },
       { target: "se-input", title: "Réponds vite", text: "Tape le nom du champion, les fautes de frappe sont tolérées. Tu peux passer un sort difficile." },
-      { target: "se-timer", title: "Chaque seconde compte", text: "30 secondes au départ, +3 s par bonne réponse." }
+      { target: "se-timer", title: "Chaque seconde compte", text: "30 secondes au départ, +3 s par bonne réponse. Chaque erreur retire {s} s au chrono.", params: { s: SE_ERROR_MS / 1000 } }
     ]
   },
   splash: {

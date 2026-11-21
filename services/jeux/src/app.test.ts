@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import sharp from "sharp";
 import { CHAMPION_BY_ID } from "@loltr/content";
-import { CDJ_MAX_TRIES, dayKey } from "@loltr/shared";
+import { CDJ_MAX_TRIES, MELI_ERROR_MS, SE_ERROR_MS, dayKey } from "@loltr/shared";
 import { createJeuxApp } from "./app";
 import { createDb } from "./db";
 import { compare } from "./games/cdj";
@@ -45,9 +45,13 @@ describe("moteurs", () => {
     for (const tile of goal) state = e.act(state, { type: "click", tile }, 2000).state;
     expect(e.result(state, 2000).champions).toBe(1);
     expect(state.endsAt).toBe(end0 + 5000);
-    // une erreur ne coûte rien
+    // une erreur retire MELI_ERROR_MS au chrono
     const wrong = [...Array(25).keys()].find((i) => !(e.reveal(state) as any).goal.includes(i))!;
-    expect(e.act(state, { type: "click", tile: wrong }, 2100).feedback.wrong).toBe(wrong);
+    const miss = e.act(state, { type: "click", tile: wrong }, 2100);
+    expect(miss.feedback.wrong).toBe(wrong);
+    expect(miss.state.endsAt).toBe(state.endsAt - MELI_ERROR_MS);
+    // jamais sous l'instant présent : le chrono tombe à zéro, la manche se termine
+    expect(e.act({ ...state, endsAt: 2500 }, { type: "click", tile: wrong }, 2100).state.endsAt).toBe(2100);
   });
 
   test("Sorts éclair : réponse tolérante aux fautes, +3 s", () => {
@@ -56,6 +60,9 @@ describe("moteurs", () => {
     const owner = (e.reveal(state) as any).current.split(":")[0];
     const name = CHAMPION_BY_ID[owner].names.fr;
     const typo = name.length > 6 ? name.slice(0, -1) : name;
+    const miss = e.act(state, { type: "answer", champion: owner === "ahri" ? "lux" : "ahri" }, 1500);
+    expect(miss.feedback.wrong).toBeDefined();
+    expect(miss.state.endsAt).toBe(state.endsAt - SE_ERROR_MS);
     const out = e.act(state, { type: "answer", text: typo }, 1500);
     expect(out.state.correct).toBe(1);
     expect(out.state.endsAt).toBe(state.endsAt + 3000);

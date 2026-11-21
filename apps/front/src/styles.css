@@ -283,6 +283,58 @@ input::placeholder {
   animation: shake 0.35s ease;
 }
 
+/* Temps retiré au chrono (−1 s) : surgit à côté du temps, puis monte et s'efface */
+@keyframes timer-delta {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.8);
+  }
+  10% {
+    opacity: 1;
+    transform: translateY(0) scale(1.15);
+  }
+  22%,
+  65% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+}
+@keyframes timer-delta-fade {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.timer-delta {
+  animation: timer-delta 1.5s ease-out forwards;
+}
+/* La barre du chrono passe un instant au rouge quand elle perd du temps, puis reprend sa couleur */
+@keyframes timer-hit {
+  0%,
+  45% {
+    background: var(--danger);
+  }
+  100% {
+    background: var(--bar);
+  }
+}
+.timer-hit {
+  animation: timer-hit 0.7s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Sans mouvement, mais visible le temps de le lire */
+  .timer-delta {
+    animation: timer-delta-fade 1.5s linear forwards !important;
+  }
+}
+
 @keyframes pop {
   0% {
     opacity: 0;

@@ -11,6 +11,8 @@ export interface TourStep {
   target?: string;
   title: string;
   text: string;
+  /** Valeurs du texte (« {s} s ») : une règle réglable reste juste dans le tutoriel. */
+  params?: Record<string, string | number>;
 }
 
 export const SITE_TOUR: TourStep[] = [
@@ -116,7 +118,7 @@ export function Tutorial({ steps, onDone }: { steps: TourStep[]; onDone: () => v
           <h2 id="titre-tuto" className="m-0 font-d font-bold text-[22px] leading-tight">
             {t(step.title)}
           </h2>
-          <p className="m-0 text-[15px] leading-relaxed text-mut">{t(step.text)}</p>
+          <p className="m-0 text-[15px] leading-relaxed text-mut">{t(step.text, step.params)}</p>
           <div className="flex items-center justify-between gap-3 pt-1.5">
             <button type="button" className="tl text-sm" onClick={onDone}>
               {t("Passer")}

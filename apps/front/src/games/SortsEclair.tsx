@@ -27,6 +27,7 @@ export function SortsEclair({ round, act, finish, flow, groupSize, namesLang }: 
   const now = flow.demo ? pub.warmUntil : tick;
   const options = useChampionOptions(namesLang);
   const [wrong, setWrong] = useState<{ name: string; at: number } | null>(null);
+  const [penalty, setPenalty] = useState<{ ms: number; at: number } | null>(null);
   const [popAt, setPopAt] = useState(0);
   const finishing = useRef(false);
 
@@ -58,6 +59,7 @@ export function SortsEclair({ round, act, finish, flow, groupSize, namesLang }: 
     if (over || warming) return;
     const res = await act({ type: "answer", ...a }).catch(() => null);
     if (res?.feedback?.wrong) setWrong({ name: LITE_BY_ID[res.feedback.wrong]?.names[namesLang] ?? "", at: Date.now() });
+    if (res?.feedback?.penaltyMs) setPenalty({ ms: -res.feedback.penaltyMs, at: Date.now() });
     if (res?.feedback?.correct) {
       setWrong(null);
       setPopAt(Date.now());
@@ -84,7 +86,7 @@ export function SortsEclair({ round, act, finish, flow, groupSize, namesLang }: 
       <GameBar game="se" sub={modeSub(t, flow, groupSize)} counterLabel={t("Sorts")} counter={pub.correct} onQuit={flow.onQuit} />
       <main className="flex-auto min-h-0 flex flex-wrap items-center justify-center gap-x-10 gap-y-6 pt-2.5 pb-6 gutter">
         <section aria-label={t("Partie")} className="flex flex-col items-center gap-[18px] max-w-full" style={{ width: 640 }}>
-          <TimerBar leftMs={warming ? SE_START_MS : leftMs} totalMs={SE_START_MS} tuto="se-timer" />
+          <TimerBar leftMs={warming ? SE_START_MS : leftMs} totalMs={SE_START_MS} tuto="se-timer" delta={penalty} />
           <div className="relative" data-tuto="se-icon">
             <div
               key={pub.q}

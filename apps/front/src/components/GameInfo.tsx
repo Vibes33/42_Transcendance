@@ -70,7 +70,7 @@ export function GameInfo({ card }: { card: GameCard }) {
                 {steps.length ? (
                   steps.map((s) => (
                     <p key={s.title} className="m-0 text-[13.5px] leading-snug text-ink">
-                      <b className="font-bold">{t(s.title)}.</b> <span className="text-mut">{t(s.text)}</span>
+                      <b className="font-bold">{t(s.title)}.</b> <span className="text-mut">{t(s.text, s.params)}</span>
                     </p>
                   ))
                 ) : (

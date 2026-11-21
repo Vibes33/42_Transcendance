@@ -72,7 +72,9 @@ function PartiePage() {
   const tutoForce = ctx === "classique" && !session && sp.get("tuto") === "1";
 
   // Tutoriel à la première partie en solo de chaque jeu (avant de lancer le chrono)
-  const needsTuto = !!game && GAME_UI[game].tutorial.length > 0 && !session && !!me.profile && ctx !== "streamer" && !me.profile.tutorials?.[game];
+  // Tutoriel vu sur cette page : la manche peut partir sans attendre que le profil le confirme
+  const [tutoSeen, setTutoSeen] = useState<GameKey | null>(null);
+  const needsTuto = !!game && game !== tutoSeen && GAME_UI[game].tutorial.length > 0 && !session && !!me.profile && ctx !== "streamer" && !me.profile.tutorials?.[game];
 
   useEffect(() => {
     if (needsTuto && !round) setTutorial(game);
@@ -89,7 +91,9 @@ function PartiePage() {
 
   // Création ou reprise de la manche
   useEffect(() => {
-    if (round || !wanted || tutorial || tutoForce || !me.session || me.isAnon) return;
+    // Tutoriel à venir (le profil dit s'il est déjà vu) : la manche, et son chrono, attendent sa fin.
+    // `tutorial` n'est posé qu'au rendu suivant, d'où le test direct de `needsTuto`.
+    if (round || !wanted || tutorial || needsTuto || tutoForce || !me.session || !me.profile || me.isAnon) return;
     if (sessionId && !session) return;
     if (session && session.phase !== "playing") return;
     if (myMember && myMember.status === "away") return;
@@ -113,7 +117,7 @@ function PartiePage() {
       // Impossible de jouer cette partie (défi déjà fait en solo…) : on libère le groupe
       if (session?.kind === "group") post(`/api/temps-reel/sessions/${session.id}/leave`).catch(() => {});
     });
-  }, [roundKey, !!round, tutorial, tutoForce, !!daily, me.session?.userId, session?.phase, myMember?.status]);
+  }, [roundKey, !!round, tutorial, needsTuto, tutoForce, !!daily, me.session?.userId, !!me.profile, session?.phase, myMember?.status]);
 
   // Présence affichée aux amis pendant la partie
   useEffect(() => {
@@ -238,6 +242,7 @@ function PartiePage() {
           steps={GAME_UI[tutorial].tutorial}
           onDone={() => {
             markTutorial(tutorial);
+            setTutoSeen(tutorial);
             if (tutoForce) nav("/parametres");
             else setTutorial(null);
           }}

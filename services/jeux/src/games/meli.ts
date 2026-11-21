@@ -1,9 +1,9 @@
-import { MELI_BONUS_MS, MELI_START_MS, TIMER_GRACE_MS, WARMUP_MS, pick, rng, shuffle } from "@loltr/shared";
+import { MELI_BONUS_MS, MELI_ERROR_MS, MELI_START_MS, TIMER_GRACE_MS, WARMUP_MS, pick, rng, shuffle } from "@loltr/shared";
 import { CHAMPIONS, CHAMPION_BY_ID, img } from "@loltr/content";
 import { GameError, type GameEngine } from "./engine";
 
 // Méli-MéLoL : retrouver 4 sorts du champion dans une grille de 25 icônes.
-// Chrono 30 s, +5 s par champion complété ; une erreur fait trembler la case, sans pénalité.
+// Chrono 30 s, +5 s par champion complété ; une erreur fait trembler la case et retire 1 s (MELI_ERROR_MS).
 
 interface Board {
   target: string;
@@ -70,7 +70,8 @@ export const meli: GameEngine<S> = {
     const tile = action.tile;
     if (tile < 0 || tile >= s.board.tiles.length) throw new GameError("bad_tile");
     if (s.found.includes(tile)) return { state: s, feedback: { already: true } };
-    if (!s.board.goal.includes(tile)) return { state: s, feedback: { wrong: tile } };
+    // Mauvaise case : le chrono perd MELI_ERROR_MS (sans passer sous l'instant présent)
+    if (!s.board.goal.includes(tile)) return { state: { ...s, endsAt: Math.max(now, s.endsAt - MELI_ERROR_MS) }, feedback: { wrong: tile, penaltyMs: MELI_ERROR_MS } };
     const found = [...s.found, tile];
     if (found.length < 4) return { state: { ...s, found }, feedback: { good: tile } };
     // Champion complété : +5 s et nouvelle grille

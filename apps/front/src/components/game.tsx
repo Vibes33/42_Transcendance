@@ -218,8 +218,12 @@ export function AnswerInput({
   );
 }
 
-/** Chrono en barre : rouge sous 10 s. */
-export function TimerBar({ leftMs, totalMs, tuto }: { leftMs: number; totalMs: number; tuto?: string }) {
+/**
+ * Chrono en barre : rouge sous 10 s. `delta` (une erreur : −1 s) : la barre tremble et passe un
+ * instant au rouge, et « −1 s » s'affiche sur la barre, au bout du temps restant, puis s'efface.
+ * `at` relance l'effet à chaque nouvelle erreur.
+ */
+export function TimerBar({ leftMs, totalMs, tuto, delta }: { leftMs: number; totalMs: number; tuto?: string; delta?: { ms: number; at: number } | null }) {
   const t = useT();
   const color = leftMs < 10_000 ? "var(--danger)" : "var(--acc)";
   const pct = Math.max(0, Math.min(100, (leftMs / totalMs) * 100));
@@ -228,8 +232,26 @@ export function TimerBar({ leftMs, totalMs, tuto }: { leftMs: number; totalMs: n
       <span className="shrink-0 min-w-[86px] font-d font-bold text-[30px]" style={{ color }}>
         {clock(leftMs)}
       </span>
-      <div role="progressbar" aria-label={t("Temps restant")} aria-valuemin={0} aria-valuemax={Math.round(totalMs / 1000)} aria-valuenow={Math.round(leftMs / 1000)} className="flex-auto h-3 bg-surf2 cut-sm">
-        <div style={{ width: pct + "%", height: 12, background: color, transition: "width .1s linear" }} />
+      <div className="relative flex-auto">
+        <div
+          key={delta?.at ?? 0}
+          role="progressbar"
+          aria-label={t("Temps restant")}
+          aria-valuemin={0}
+          aria-valuemax={Math.round(totalMs / 1000)}
+          aria-valuenow={Math.round(leftMs / 1000)}
+          className={`h-3 bg-surf2 cut-sm ${delta ? "shake" : ""}`}
+        >
+          <div className={delta ? "timer-hit" : ""} style={{ width: pct + "%", height: 12, ["--bar" as string]: color, background: "var(--bar)", transition: "width .1s linear" }} />
+        </div>
+        {delta && (
+          <span aria-hidden="true" className="absolute z-10 top-1/2 pointer-events-none" style={{ left: pct + "%", transform: "translate(-50%, -50%)" }}>
+            <span key={delta.at} className="timer-delta block px-2.5 py-0.5 bg-surf cut-sm font-d font-bold text-[20px] whitespace-nowrap" style={{ color: delta.ms < 0 ? "var(--danger)" : "var(--ok)" }}>
+              {delta.ms < 0 ? "−" : "+"}
+              {Math.abs(delta.ms) / 1000} s
+            </span>
+          </span>
+        )}
       </div>
     </div>
   );

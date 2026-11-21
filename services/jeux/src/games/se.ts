@@ -1,9 +1,9 @@
-import { SE_BONUS_MS, SE_START_MS, TIMER_GRACE_MS, WARMUP_MS, rng } from "@loltr/shared";
+import { SE_BONUS_MS, SE_ERROR_MS, SE_START_MS, TIMER_GRACE_MS, WARMUP_MS, rng } from "@loltr/shared";
 import { CHAMPIONS, CHAMPION_BY_ID, img } from "@loltr/content";
 import { GameError, resolveChampion, type GameEngine } from "./engine";
 
 // Sorts éclair : une icône de sort s'affiche, à quel champion appartient-elle ?
-// Chrono 30 s, +3 s par bonne réponse ; « Passer » change de sort sans pénalité.
+// Chrono 30 s, +3 s par bonne réponse, −1 s par mauvaise (SE_ERROR_MS) ; « Passer » change de sort sans pénalité.
 
 interface S {
   seed: string;
@@ -57,7 +57,8 @@ export const se: GameEngine<S> = {
     if (action.type === "skip") return { state: next({ skipped: s.skipped + 1 }, "skip"), feedback: { skipped: s.current } };
     if (action.type !== "answer") throw new GameError("bad_action");
     const c = resolveChampion(action);
-    if (c.id !== owner(s.current)) return { state: s, feedback: { wrong: c.id } };
+    // Mauvais champion : le chrono perd SE_ERROR_MS (un nom inconnu ne compte pas comme une erreur)
+    if (c.id !== owner(s.current)) return { state: { ...s, endsAt: Math.max(now, s.endsAt - SE_ERROR_MS) }, feedback: { wrong: c.id, penaltyMs: SE_ERROR_MS } };
     return { state: next({ correct: s.correct + 1, endsAt: s.endsAt + SE_BONUS_MS }, "ok"), feedback: { correct: s.current, bonusMs: SE_BONUS_MS } };
   },
   isOver(s, now) {

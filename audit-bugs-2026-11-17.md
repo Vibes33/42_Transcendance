@@ -215,7 +215,7 @@ Ce qui a été vérifié et trouvé correct est listé à la fin.
 - **P5.** Tolérance aux fautes : 0 faute pour les noms de 3 lettres ou moins et 1 pour 5 lettres ou moins, alors que la spécification dit ≤ 2. « Sena » est refusé à cause d'une égalité avec Sona.
 - **P6.** Accent de l'étape « premier chibi » : jaune Lux (CLAUDE.md) ou celui du chibi sélectionné (le code) ?
 - **P7.** Champion du jour est censé être jouable depuis l'accueil avant toute connexion ; le code redirige d'abord vers `/connexion`.
-- **P8.** Méli-MéLoL et Sorts éclair : une erreur ne coûte rien, donc un bot peut tout essayer.
+- **P8.** Méli-MéLoL et Sorts éclair : une erreur ne coûte rien, donc un bot peut tout essayer. **Tranché le 21/11 :** chaque erreur retire 1 s au chrono (`MELI_ERROR_MS`, `SE_ERROR_MS` dans `packages/shared/src/rules.ts`).
 
 ---
 
