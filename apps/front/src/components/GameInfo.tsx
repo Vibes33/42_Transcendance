@@ -59,7 +59,7 @@ export function GameInfo({ card }: { card: GameCard }) {
         {pill("info", t("Principe du jeu {name}", { name: t(card.name) }), "i")}
       </div>
       {open && (
-        <div role="tooltip" className="absolute top-[calc(100%+8px)] right-0 w-[min(80vw,330px)] p-[1.5px] bg-acc cut-sm text-left" style={{ filter: "drop-shadow(0 14px 28px rgba(0,0,0,.4))" }}>
+        <div role="tooltip" className="absolute top-[calc(100%+8px)] right-0 w-[min(80vw,320px)] p-[1.5px] bg-acc cut-sm text-left" style={{ filter: "drop-shadow(0 14px 28px rgba(0,0,0,.4))" }}>
           <div className="flex flex-col gap-2 px-4 py-3.5 bg-surf cut-sm">
             <span className="font-d font-bold text-base uppercase tracking-[0.04em] text-acc">{t(card.name)}</span>
             {open === "rank" && card.key ? (
