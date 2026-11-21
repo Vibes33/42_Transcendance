@@ -124,3 +124,29 @@ export function rankFor(top: number): RankInfo {
   }
   return { id: "bronze", division: 3 };
 }
+
+// --- Classement du jour d'un mini-jeu (affiché dans la description du jeu) ----------------
+
+/** Jeux classés : tous sauf World Mayhem (classement à part) et Champion parfait (un vote, pas un score). */
+export const RANKED_GAMES: GameKey[] = ["cdj", "meli", "se", "splash", "portrait", "chaudfroid", "connexions", "buildpath", "qcm", "sudoku", "codenames", "devine"];
+
+export type GameMetric = "essais" | "champions" | "sorts" | "temps" | "score";
+
+/** Mesure affichée au classement d'un jeu, et sa valeur pour un résultat. */
+export function metricOf(r: RoundResult): { metric: GameMetric; value: number } {
+  switch (r.game) {
+    case "cdj":
+    case "splash":
+      return { metric: "essais", value: r.tries ?? 0 };
+    case "meli":
+      return { metric: "champions", value: r.champions ?? 0 };
+    case "se":
+      return { metric: "sorts", value: r.correct ?? 0 };
+    case "sudoku":
+      return { metric: "temps", value: r.durationMs };
+    default:
+      return { metric: "score", value: r.score ?? 0 };
+  }
+}
+
+export const METRIC_OF_GAME = (game: GameKey): GameMetric => metricOf({ game, durationMs: 0 }).metric;

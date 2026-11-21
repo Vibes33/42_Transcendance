@@ -180,3 +180,9 @@ export const Clock = ({ size = 18, className }: P) => (
     <path d="M3 3v5h5M12 7v5l3 2" />
   </svg>
 );
+
+export const Trophy = ({ size = 18, className }: P) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" className={className}>
+    <path d="M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1.5A3.5 3.5 0 0 0 7.5 11M17 6h3v1.5a3.5 3.5 0 0 1-3.5 3.5M12 14v4M8 21h8M9 18h6" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);

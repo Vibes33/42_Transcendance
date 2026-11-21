@@ -5,6 +5,11 @@ import {
   GAMES,
   addDays,
   basePoints,
+  compareResults,
+  hasPerformance,
+  metricOf,
+  METRIC_OF_GAME,
+  RANKED_GAMES,
   dayKey,
   forceCloseAt,
   nextRotationAt,
@@ -12,6 +17,9 @@ import {
   rng,
   shuffle,
   type DailyState,
+  type GameLeaderboard,
+  type GameLeaderRow,
+  type RoundResult,
   type PublicPlayer,
   type GameContext,
   type GameKey,
@@ -506,6 +514,45 @@ export function createJeuxApp(deps: JeuxDeps) {
     })
     // Sudoku LoL : temps des grilles du jour réussies. Seule la première grille commencée par chacun
     // compte, réussie ou non : une grille abandonnée puis relancée ne se rejoue pas pour le temps.
+    // Classement du jour d'un mini-jeu (description du jeu) : le meilleur résultat de chacun. Jeu de la
+    // rotation : les manches du défi (celles qui rapportent des points) ; sinon les parties classiques.
+    .get(
+      "/leaderboard/:game",
+      async ({ caller, params, query }): Promise<GameLeaderboard> => {
+        const game = params.game as GameKey;
+        if (!RANKED_GAMES.includes(game)) fail(404, "no_leaderboard");
+        const day = dayKey(now());
+        const source = rotationFor(day).includes(game) ? "defi" : "classique";
+        let ids: Set<string> | null = null;
+        if (query.scope === "copains") {
+          const u = requireAccount(caller);
+          ids = new Set([u, ...((await deps.friends?.(u)) ?? [])]);
+        }
+        const rows = db
+          .select({ userId: rounds.userId, result: rounds.result })
+          .from(rounds)
+          .where(and(eq(rounds.game, game), eq(rounds.day, day), eq(rounds.context, source), eq(rounds.kind, "user"), eq(rounds.over, true)))
+          .all();
+        const best = new Map<string, RoundResult>();
+        for (const r of rows) {
+          const res = r.result as RoundResult | null;
+          if (!res || (ids && !ids.has(r.userId))) continue;
+          const cur = best.get(r.userId);
+          if (!cur || compareResults(res, cur) < 0) best.set(r.userId, res);
+        }
+        const sorted = [...best.entries()].sort((a, b) => compareResults(a[1], b[1]));
+        // Ex aequo : même rang
+        const ranks: number[] = [];
+        sorted.forEach(([, r], i) => ranks.push(i > 0 && compareResults(r, sorted[i - 1][1]) === 0 ? ranks[i - 1] : i + 1));
+        const me = caller.kind === "user" ? caller.id : null;
+        const myIdx = me ? sorted.findIndex(([u]) => u === me) : -1;
+        const shown = [...sorted.slice(0, 10).map((_, i) => i), ...(myIdx >= 10 ? [myIdx] : [])];
+        const profiles = Object.fromEntries(((await deps.players?.(shown.map((i) => sorted[i][0])).catch(() => [])) ?? []).map((p) => [p.userId, p]));
+        const line = (i: number): GameLeaderRow => ({ rank: ranks[i], player: profiles[sorted[i][0]] ?? null, value: metricOf(sorted[i][1]).value, performed: hasPerformance(sorted[i][1]), me: sorted[i][0] === me });
+        return { game, day, source, metric: METRIC_OF_GAME(game), total: sorted.length, rows: shown.filter((i) => i < 10).map(line), me: myIdx >= 0 ? line(myIdx) : null };
+      },
+      { query: t.Object({ scope: t.Optional(t.Union([t.Literal("mondial"), t.Literal("copains")])) }) }
+    )
     .get("/sudoku/stats", ({ caller }) => {
       const today = dayKey(now());
       const rows = db.select().from(rounds).where(and(eq(rounds.game, "sudoku"), eq(rounds.day, today))).all();

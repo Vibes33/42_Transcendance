@@ -272,3 +272,26 @@ describe("groupe", () => {
     expect(b.body.mode).toBe("groupe");
   });
 });
+
+describe("classement du jour d'un jeu", () => {
+  test("meilleur résultat de chacun, réussites devant, jeu hors rotation = parties classiques", async () => {
+    const { post, call, advance } = setup({ owned: { u1: ["game:sudoku"], u2: ["game:sudoku"] } });
+    const solve = async (u: string) => {
+      const r = (await post("/rounds", u, { game: "sudoku", context: "classique" })).body;
+      const { state } = ENGINES.sudoku.create({ seed: "sudoku:" + dayKey(r.startedAt), now: 0, seen: new Set() });
+      for (let i = 0; i < state.solution.length; i++) if (state.given[i] < 0) await post(`/rounds/${r.id}/act`, u, { type: "place", cell: i, value: state.solution[i] });
+    };
+    // u2 abandonne une grille, puis u1 la réussit
+    const quit = (await post("/rounds", "u2", { game: "sudoku", context: "classique" })).body;
+    await post(`/rounds/${quit.id}/finish`, "u2", { quit: true });
+    advance(5000);
+    await solve("u1");
+    const lb = (await call("/leaderboard/sudoku", "u2")).body;
+    expect(lb.source).toBe("classique");
+    expect(lb.metric).toBe("temps");
+    expect(lb.total).toBe(2);
+    expect(lb.rows.map((r: any) => [r.rank, r.performed])).toEqual([[1, true], [2, false]]);
+    expect(lb.me.rank).toBe(2);
+    expect((await call("/leaderboard/parfait", "u1")).status).toBe(404);
+  });
+});

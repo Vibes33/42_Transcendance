@@ -1,4 +1,5 @@
 import type { GameContext, GameKey, SiteLang } from "./rules";
+import type { GameMetric } from "./scoring";
 
 // Contrats d'API partagés entre le front et les services.
 
@@ -184,3 +185,24 @@ export type WsClientMessage =
   | { type: "presence"; state: Exclude<PresenceState, "offline">; note?: string }
   | { type: "watch"; code: string }
   | { type: "ping" };
+
+/** Ligne du classement du jour d'un mini-jeu. */
+export interface GameLeaderRow {
+  rank: number;
+  player: PublicPlayer | null;
+  value: number;
+  /** Performance classable (champion trouvé, grille réussie…) : sinon la ligne est en bas. */
+  performed: boolean;
+  me: boolean;
+}
+
+/** Classement du jour d'un mini-jeu : défi du jour si le jeu est dans la rotation, sinon parties classiques. */
+export interface GameLeaderboard {
+  game: GameKey;
+  day: string;
+  source: "defi" | "classique";
+  metric: GameMetric;
+  total: number;
+  rows: GameLeaderRow[];
+  me: GameLeaderRow | null;
+}
